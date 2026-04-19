@@ -1,0 +1,428 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "../../../lib/supabase/client";
+import Notice from "../../../components/notice";
+
+
+type ReservationItem = {
+  id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  store_products: {
+    image_url: string | null;
+    products: {
+      product_name: string;
+      description: string | null;
+      brand: string | null;
+    } | null;
+  } | null;
+};
+
+type ReservationRow = {
+  id: string;
+  status: string;
+  pickup_code: string;
+  total_amount: number;
+  reserved_at: string;
+  expires_at: string | null;
+  pickup_at: string | null;
+  merchant_message: string | null;
+  cancelled_by: string | null;
+  customer_cancel_reason: string | null;
+  notes: string | null;
+  stores: {
+    store_name: string;
+    address_text: string;
+  } | null;
+  reservation_items: ReservationItem[];
+};
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export default function CustomerReservationsPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<{
+    type: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [reservations, setReservations] = useState<ReservationRow[]>([]);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
+const [cancelReason, setCancelReason] = useState("");
+const [cancelLoading, setCancelLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadReservations() {
+      try {
+        let sessionUser: { id: string } | null = null;
+
+        for (let i = 0; i < 4; i++) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (session?.user) {
+            sessionUser = { id: session.user.id };
+            break;
+          }
+
+          await wait(250);
+        }
+
+        if (!mounted) return;
+
+        if (!sessionUser) {
+          window.location.href = "/auth/sign-in?next=/customer/reservations";
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", sessionUser.id)
+          .maybeSingle();
+
+        if (!mounted) return;
+
+        if (profileError) {
+          setNotice({ type: "error", message: profileError.message });
+          setLoading(false);
+          return;
+        }
+
+        if (!profile || profile.role !== "customer") {
+          setNotice({
+            type: "warning",
+            message: "Solo las cuentas de cliente pueden ver esta sección.",
+          });
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("reservations")
+          .select(`
+            id,
+            status,
+            pickup_code,
+            total_amount,
+            reserved_at,
+            expires_at,
+            pickup_at,
+            merchant_message,
+            cancelled_by,
+            customer_cancel_reason,
+            notes,
+            stores:store_id (
+              store_name,
+              address_text
+            ),
+            reservation_items (
+              id,
+              quantity,
+              unit_price,
+              subtotal,
+              store_products:store_product_id (
+                image_url,
+                products:product_id (
+                  product_name,
+                  description,
+                  brand
+                )
+              )
+            )
+          `)
+          .eq("customer_user_id", sessionUser.id)
+          .order("reserved_at", { ascending: false });
+
+        if (!mounted) return;
+
+        if (error) {
+          setNotice({ type: "error", message: error.message });
+          setLoading(false);
+          return;
+        }
+
+        setReservations((data as ReservationRow[]) ?? []);
+        setLoading(false);
+      } catch {
+        if (!mounted) return;
+        setNotice({
+          type: "error",
+          message: "No se pudo cargar tus reservas.",
+        });
+        setLoading(false);
+      }
+    }
+
+    loadReservations();
+
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
+
+  function openCancelModal(reservationId: string) {
+  setReservationToCancel(reservationId);
+  setCancelReason("");
+  setCancelModalOpen(true);
+}
+
+async function handleConfirmCancelReservation() {
+  if (!reservationToCancel) return;
+
+  setCancelLoading(true);
+
+  const { error } = await supabase.rpc("cancel_own_reservation", {
+    p_reservation_id: reservationToCancel,
+    p_reason: cancelReason.trim() || null,
+  });
+
+  if (error) {
+    setNotice({ type: "error", message: error.message });
+    setCancelLoading(false);
+    return;
+  }
+
+  setReservations((prev) =>
+    prev.map((item) =>
+      item.id === reservationToCancel
+        ? {
+            ...item,
+            status: "cancelled",
+            cancelled_by: "customer",
+            customer_cancel_reason: cancelReason.trim() || null,
+          }
+        : item
+    )
+  );
+
+  setCancelLoading(false);
+  setCancelModalOpen(false);
+  setReservationToCancel(null);
+  setCancelReason("");
+
+  setNotice({
+    type: "success",
+    message: "La reserva fue cancelada correctamente.",
+  });
+}
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+        Cargando reservas...
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Mis reservas</h1>
+            <p className="mt-2 text-gray-400">
+              Aquí puedes ver el historial de tus reservas, revisar estados y cancelar las que sigan pendientes.
+            </p>
+          </div>
+
+          <Link
+            href="/"
+            className="rounded-lg bg-gray-800 px-4 py-2 font-semibold hover:bg-gray-700"
+          >
+            Volver al inicio
+          </Link>
+        </div>
+
+        {notice && <Notice type={notice.type} message={notice.message} />}
+
+        {reservations.length === 0 ? (
+          <div className="mt-4 rounded-2xl bg-gray-900 p-6 shadow-lg">
+            No tienes reservas todavía.
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {reservations.map((item) => (
+              <article
+                key={item.id}
+                className="rounded-2xl bg-gray-900 p-6 shadow-lg"
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      {item.stores?.store_name || "Tienda"}
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {item.stores?.address_text || "Sin dirección"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-800 px-4 py-3 text-sm">
+                    <p>
+                      Estado:{" "}
+                      <span
+                        className={`font-semibold ${
+                          item.status === "pending"
+                            ? "text-yellow-400"
+                            : item.status === "confirmed"
+                            ? "text-blue-400"
+                            : item.status === "ready"
+                            ? "text-indigo-400"
+                            : item.status === "completed"
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {item.status}
+                      </span>
+                    </p>
+                    <p className="mt-1">Código: {item.pickup_code}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm text-gray-300">
+                  <p>Total: S/ {Number(item.total_amount).toFixed(2)}</p>
+                  <p>Fecha de reserva: {new Date(item.reserved_at).toLocaleString()}</p>
+                  <p>
+                    Recojo:{" "}
+                    {item.pickup_at
+                      ? new Date(item.pickup_at).toLocaleString()
+                      : "No definido"}
+                  </p>
+                  <p>
+                    Expira:{" "}
+                    {item.expires_at
+                      ? new Date(item.expires_at).toLocaleString()
+                      : "Sin fecha"}
+                  </p>
+                </div>
+
+                {item.notes && (
+                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
+                    <p className="text-sm text-gray-400">Nota del cliente</p>
+                    <p className="mt-1 text-sm text-white">{item.notes}</p>
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <h3 className="mb-3 text-lg font-semibold">Productos de la reserva</h3>
+                  <div className="space-y-3">
+                    {item.reservation_items.map((detail) => (
+                      <div
+                        key={detail.id}
+                        className="rounded-xl bg-gray-800 p-4"
+                      >
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-semibold">
+                              {detail.store_products?.products?.product_name || "Producto"}
+                            </p>
+                            <p className="text-sm text-gray-400">
+                              Marca: {detail.store_products?.products?.brand || "Sin marca"}
+                            </p>
+                          </div>
+
+                          <div className="text-sm text-gray-300">
+                            <p>Cantidad: {detail.quantity}</p>
+                            <p>Precio unitario: S/ {Number(detail.unit_price).toFixed(2)}</p>
+                            <p>Subtotal: S/ {Number(detail.subtotal).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {item.merchant_message && (
+                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
+                    <p className="text-sm text-gray-400">Mensaje del vendedor</p>
+                    <p className="mt-1 text-sm text-white">{item.merchant_message}</p>
+                  </div>
+                )}
+
+                {item.customer_cancel_reason && (
+                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
+                    <p className="text-sm text-gray-400">Motivo de cancelación</p>
+                    <p className="mt-1 text-sm text-white">
+                      {item.customer_cancel_reason}
+                    </p>
+                  </div>
+                )}
+
+                {item.cancelled_by && (
+                  <p className="mt-3 text-sm text-gray-400">
+                    Cancelada por: {item.cancelled_by}
+                  </p>
+                )}
+
+                {(item.status === "pending" || item.status === "confirmed") && (
+                  <button
+  onClick={() => openCancelModal(item.id)}
+  className="mt-4 rounded-lg bg-red-600 px-4 py-2 font-semibold hover:bg-red-700"
+>
+  Cancelar reserva
+</button>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+      {cancelModalOpen && (
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4">
+    <div className="w-full max-w-md rounded-2xl bg-gray-900 p-6 shadow-xl">
+      <h2 className="text-2xl font-bold">Cancelar reserva</h2>
+      <p className="mt-2 text-sm text-gray-400">
+        Puedes escribir un motivo opcional antes de cancelar.
+      </p>
+
+      <div className="mt-4">
+        <label className="mb-2 block text-sm text-gray-400">
+          Motivo de cancelación
+        </label>
+        <textarea
+          rows={4}
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          placeholder="Ejemplo: ya no podré recogerlo hoy"
+          className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
+        />
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setCancelModalOpen(false);
+            setReservationToCancel(null);
+            setCancelReason("");
+          }}
+          className="flex-1 rounded-lg bg-gray-700 px-4 py-3 font-semibold hover:bg-gray-600"
+        >
+          Cerrar
+        </button>
+
+        <button
+          type="button"
+          onClick={handleConfirmCancelReservation}
+          disabled={cancelLoading}
+          className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold hover:bg-red-700 disabled:opacity-60"
+        >
+          {cancelLoading ? "Cancelando..." : "Cancelar reserva"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+    </main>
+  );
+}
