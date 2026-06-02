@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 
-export default function SignInPage() {
+function SignInForm() {
   const supabase = createClient();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
@@ -54,15 +53,15 @@ export default function SignInPage() {
     }
 
     if (profile.role === "merchant") {
-  window.location.replace("/dashboard");
-  return;
-}
+      window.location.replace("/dashboard");
+      return;
+    }
 
-if (profile.role === "customer") {
-  const nextUrl = searchParams.get("next") || "/";
-  window.location.replace(nextUrl);
-  return;
-}
+    if (profile.role === "customer") {
+      const nextUrl = searchParams.get("next") || "/";
+      window.location.replace(nextUrl);
+      return;
+    }
 
     await supabase.auth.signOut();
     setMessage("Rol de usuario no válido.");
@@ -70,58 +69,72 @@ if (profile.role === "customer") {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md rounded-2xl bg-gray-900 p-8 shadow-lg">
-        <h1 className="text-3xl font-bold mb-2">Iniciar sesión</h1>
-        <p className="text-gray-400 mb-6">
-          Ingresa con tu correo y contraseña.
-        </p>
+    <main className="app-page flex items-center justify-center px-6">
+      <div className="w-full max-w-md app-card p-8 shadow-lg">
+        <div className="mb-6">
+          <h1 className="page-title text-3xl">Iniciar sesión</h1>
+          <p className="mt-2 text-base text-muted">
+            Ingresa con tu correo y contraseña.
+          </p>
+        </div>
 
         <form onSubmit={handleSignIn} className="space-y-4">
           <div>
-            <label className="block mb-2 text-sm">Correo</label>
+            <label className="mb-2 block small-label">Correo</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
+              className="app-input"
+              placeholder="tucorreo@ejemplo.com"
             />
           </div>
 
           <div>
-            <label className="block mb-2 text-sm">Contraseña</label>
+            <label className="mb-2 block small-label">Contraseña</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
+              className="app-input"
+              placeholder="••••••••"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-cyan-600 px-4 py-3 font-semibold hover:bg-cyan-700 disabled:opacity-60"
+            className="btn-primary w-full disabled:opacity-60"
           >
             {loading ? "Ingresando..." : "Entrar"}
           </button>
         </form>
 
-        {message && (
-          <p className="mt-4 rounded-lg bg-gray-800 p-3 text-sm text-gray-200">
-            {message}
-          </p>
-        )}
+        {message && <p className="info-box mt-4">{message}</p>}
 
-        <p className="mt-6 text-sm text-gray-400">
+        <p className="mt-6 text-sm text-muted">
           ¿No tienes cuenta?{" "}
-          <Link href="/auth/sign-up" className="text-cyan-400 hover:underline">
+          <Link href="/auth/sign-up" className="link-primary">
             Regístrate
           </Link>
         </p>
       </div>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="app-page flex items-center justify-center px-6">
+          Cargando inicio de sesion...
+        </main>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

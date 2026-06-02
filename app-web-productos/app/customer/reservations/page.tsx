@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import Notice from "../../../components/notice";
 
-
 type ReservationItem = {
   id: string;
   quantity: number;
@@ -40,12 +39,64 @@ type ReservationRow = {
   reservation_items: ReservationItem[];
 };
 
+type MaybeArray<T> = T | T[] | null;
+type StoreRelation = NonNullable<ReservationRow["stores"]>;
+type ProductRelation = NonNullable<
+  NonNullable<ReservationItem["store_products"]>["products"]
+>;
+type StoreProductRelation = Omit<
+  NonNullable<ReservationItem["store_products"]>,
+  "products"
+> & {
+  products: MaybeArray<ProductRelation>;
+};
+type RawReservationItem = Omit<ReservationItem, "store_products"> & {
+  store_products: MaybeArray<StoreProductRelation>;
+};
+type RawReservationRow = Omit<
+  ReservationRow,
+  "stores" | "reservation_items"
+> & {
+  stores: MaybeArray<StoreRelation>;
+  reservation_items: RawReservationItem[] | null;
+};
+
+function firstOrNull<T>(value: MaybeArray<T> | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeReservationItem(item: RawReservationItem): ReservationItem {
+  const storeProduct = firstOrNull(item.store_products);
+
+  return {
+    ...item,
+    store_products: storeProduct
+      ? {
+          ...storeProduct,
+          products: firstOrNull(storeProduct.products),
+        }
+      : null,
+  };
+}
+
+function normalizeReservationRow(row: RawReservationRow): ReservationRow {
+  return {
+    ...row,
+    stores: firstOrNull(row.stores),
+    reservation_items: (row.reservation_items ?? []).map(
+      normalizeReservationItem
+    ),
+  };
+}
+
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default function CustomerReservationsPage() {
   const supabase = useMemo(() => createClient(), []);
+
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{
     type: "success" | "warning" | "error";
@@ -53,9 +104,9 @@ export default function CustomerReservationsPage() {
   } | null>(null);
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
-const [cancelReason, setCancelReason] = useState("");
-const [cancelLoading, setCancelLoading] = useState(false);
+  const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -151,7 +202,7 @@ const [cancelLoading, setCancelLoading] = useState(false);
           return;
         }
 
-        setReservations((data as ReservationRow[]) ?? []);
+        setReservations((data ?? []).map(normalizeReservationRow));
         setLoading(false);
       } catch {
         if (!mounted) return;
@@ -171,74 +222,71 @@ const [cancelLoading, setCancelLoading] = useState(false);
   }, [supabase]);
 
   function openCancelModal(reservationId: string) {
-  setReservationToCancel(reservationId);
-  setCancelReason("");
-  setCancelModalOpen(true);
-}
-
-async function handleConfirmCancelReservation() {
-  if (!reservationToCancel) return;
-
-  setCancelLoading(true);
-
-  const { error } = await supabase.rpc("cancel_own_reservation", {
-    p_reservation_id: reservationToCancel,
-    p_reason: cancelReason.trim() || null,
-  });
-
-  if (error) {
-    setNotice({ type: "error", message: error.message });
-    setCancelLoading(false);
-    return;
+    setReservationToCancel(reservationId);
+    setCancelReason("");
+    setCancelModalOpen(true);
   }
 
-  setReservations((prev) =>
-    prev.map((item) =>
-      item.id === reservationToCancel
-        ? {
-            ...item,
-            status: "cancelled",
-            cancelled_by: "customer",
-            customer_cancel_reason: cancelReason.trim() || null,
-          }
-        : item
-    )
-  );
+  async function handleConfirmCancelReservation() {
+    if (!reservationToCancel) return;
 
-  setCancelLoading(false);
-  setCancelModalOpen(false);
-  setReservationToCancel(null);
-  setCancelReason("");
+    setCancelLoading(true);
 
-  setNotice({
-    type: "success",
-    message: "La reserva fue cancelada correctamente.",
-  });
-}
+    const { error } = await supabase.rpc("cancel_own_reservation", {
+      p_reservation_id: reservationToCancel,
+      p_reason: cancelReason.trim() || null,
+    });
+
+    if (error) {
+      setNotice({ type: "error", message: error.message });
+      setCancelLoading(false);
+      return;
+    }
+
+    setReservations((prev) =>
+      prev.map((item) =>
+        item.id === reservationToCancel
+          ? {
+              ...item,
+              status: "cancelled",
+              cancelled_by: "customer",
+              customer_cancel_reason: cancelReason.trim() || null,
+            }
+          : item
+      )
+    );
+
+    setCancelLoading(false);
+    setCancelModalOpen(false);
+    setReservationToCancel(null);
+    setCancelReason("");
+
+    setNotice({
+      type: "success",
+      message: "La reserva fue cancelada correctamente.",
+    });
+  }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando reservas...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
+    <main className="app-page">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Mis reservas</h1>
-            <p className="mt-2 text-gray-400">
+            <h1 className="page-title text-3xl">Mis reservas</h1>
+            <p className="mt-2 text-base text-muted">
               Aquí puedes ver el historial de tus reservas, revisar estados y cancelar las que sigan pendientes.
             </p>
           </div>
 
-          <Link
-            href="/"
-            className="rounded-lg bg-gray-800 px-4 py-2 font-semibold hover:bg-gray-700"
-          >
+          <Link href="/" className="btn-soft">
             Volver al inicio
           </Link>
         </div>
@@ -246,92 +294,82 @@ async function handleConfirmCancelReservation() {
         {notice && <Notice type={notice.type} message={notice.message} />}
 
         {reservations.length === 0 ? (
-          <div className="mt-4 rounded-2xl bg-gray-900 p-6 shadow-lg">
+          <div className="app-card mt-4 p-6 shadow-lg">
             No tienes reservas todavía.
           </div>
         ) : (
           <div className="mt-4 space-y-4">
             {reservations.map((item) => (
-              <article
-                key={item.id}
-                className="rounded-2xl bg-gray-900 p-6 shadow-lg"
-              >
+              <article key={item.id} className="app-card p-6 shadow-lg">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold">
+                    <h2 className="section-title text-xl">
                       {item.stores?.store_name || "Tienda"}
                     </h2>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p className="mt-1 text-sm text-muted">
                       {item.stores?.address_text || "Sin dirección"}
                     </p>
                   </div>
 
-                  <div className="rounded-xl bg-gray-800 px-4 py-3 text-sm">
+                  <div className="app-card-soft rounded-2xl px-4 py-3 text-sm">
                     <p>
                       Estado:{" "}
                       <span
                         className={`font-semibold ${
                           item.status === "pending"
-                            ? "text-yellow-400"
+                            ? "text-amber-600"
                             : item.status === "confirmed"
-                            ? "text-blue-400"
+                            ? "text-sky-600"
                             : item.status === "ready"
-                            ? "text-indigo-400"
+                            ? "text-indigo-600"
                             : item.status === "completed"
-                            ? "text-green-400"
-                            : "text-red-400"
+                            ? "text-emerald-600"
+                            : "text-red-600"
                         }`}
                       >
                         {item.status}
                       </span>
                     </p>
-                    <p className="mt-1">Código: {item.pickup_code}</p>
+                    <p className="mt-1 text-[var(--on-surface)]">Código: {item.pickup_code}</p>
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2 text-sm text-gray-300">
+                <div className="mt-4 grid gap-3 text-sm text-muted md:grid-cols-2">
                   <p>Total: S/ {Number(item.total_amount).toFixed(2)}</p>
                   <p>Fecha de reserva: {new Date(item.reserved_at).toLocaleString()}</p>
                   <p>
                     Recojo:{" "}
-                    {item.pickup_at
-                      ? new Date(item.pickup_at).toLocaleString()
-                      : "No definido"}
+                    {item.pickup_at ? new Date(item.pickup_at).toLocaleString() : "No definido"}
                   </p>
                   <p>
                     Expira:{" "}
-                    {item.expires_at
-                      ? new Date(item.expires_at).toLocaleString()
-                      : "Sin fecha"}
+                    {item.expires_at ? new Date(item.expires_at).toLocaleString() : "Sin fecha"}
                   </p>
                 </div>
 
                 {item.notes && (
-                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
-                    <p className="text-sm text-gray-400">Nota del cliente</p>
-                    <p className="mt-1 text-sm text-white">{item.notes}</p>
+                  <div className="app-card-soft mt-4 rounded-2xl p-4">
+                    <p className="text-sm text-muted">Nota del cliente</p>
+                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.notes}</p>
                   </div>
                 )}
 
                 <div className="mt-4">
-                  <h3 className="mb-3 text-lg font-semibold">Productos de la reserva</h3>
+                  <h3 className="section-title mb-3 text-lg">Productos de la reserva</h3>
                   <div className="space-y-3">
                     {item.reservation_items.map((detail) => (
-                      <div
-                        key={detail.id}
-                        className="rounded-xl bg-gray-800 p-4"
-                      >
+                      <div key={detail.id} className="app-card-soft rounded-2xl p-4">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                           <div>
-                            <p className="font-semibold">
+                            <p className="font-semibold text-[var(--on-surface)]">
                               {detail.store_products?.products?.product_name || "Producto"}
                             </p>
-                            <p className="text-sm text-gray-400">
+                            <p className="text-sm text-muted">
                               Marca: {detail.store_products?.products?.brand || "Sin marca"}
                             </p>
                           </div>
 
-                          <div className="text-sm text-gray-300">
+                          <div className="text-sm text-muted">
                             <p>Cantidad: {detail.quantity}</p>
                             <p>Precio unitario: S/ {Number(detail.unit_price).toFixed(2)}</p>
                             <p>Subtotal: S/ {Number(detail.subtotal).toFixed(2)}</p>
@@ -343,86 +381,80 @@ async function handleConfirmCancelReservation() {
                 </div>
 
                 {item.merchant_message && (
-                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
-                    <p className="text-sm text-gray-400">Mensaje del vendedor</p>
-                    <p className="mt-1 text-sm text-white">{item.merchant_message}</p>
+                  <div className="app-card-soft mt-4 rounded-2xl p-4">
+                    <p className="text-sm text-muted">Mensaje del vendedor</p>
+                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.merchant_message}</p>
                   </div>
                 )}
 
                 {item.customer_cancel_reason && (
-                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
-                    <p className="text-sm text-gray-400">Motivo de cancelación</p>
-                    <p className="mt-1 text-sm text-white">
-                      {item.customer_cancel_reason}
-                    </p>
+                  <div className="app-card-soft mt-4 rounded-2xl p-4">
+                    <p className="text-sm text-muted">Motivo de cancelación</p>
+                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.customer_cancel_reason}</p>
                   </div>
                 )}
 
                 {item.cancelled_by && (
-                  <p className="mt-3 text-sm text-gray-400">
+                  <p className="mt-3 text-sm text-muted">
                     Cancelada por: {item.cancelled_by}
                   </p>
                 )}
 
                 {(item.status === "pending" || item.status === "confirmed") && (
-                  <button
-  onClick={() => openCancelModal(item.id)}
-  className="mt-4 rounded-lg bg-red-600 px-4 py-2 font-semibold hover:bg-red-700"
->
-  Cancelar reserva
-</button>
+                  <button onClick={() => openCancelModal(item.id)} className="btn-danger mt-4">
+                    Cancelar reserva
+                  </button>
                 )}
               </article>
             ))}
           </div>
         )}
       </div>
+
       {cancelModalOpen && (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4">
-    <div className="w-full max-w-md rounded-2xl bg-gray-900 p-6 shadow-xl">
-      <h2 className="text-2xl font-bold">Cancelar reserva</h2>
-      <p className="mt-2 text-sm text-gray-400">
-        Puedes escribir un motivo opcional antes de cancelar.
-      </p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4">
+          <div className="app-card w-full max-w-md p-6 shadow-xl">
+            <h2 className="section-title text-2xl">Cancelar reserva</h2>
+            <p className="mt-2 text-sm text-muted">
+              Puedes escribir un motivo opcional antes de cancelar.
+            </p>
 
-      <div className="mt-4">
-        <label className="mb-2 block text-sm text-gray-400">
-          Motivo de cancelación
-        </label>
-        <textarea
-          rows={4}
-          value={cancelReason}
-          onChange={(e) => setCancelReason(e.target.value)}
-          placeholder="Ejemplo: ya no podré recogerlo hoy"
-          className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
-        />
-      </div>
+            <div className="mt-4">
+              <label className="mb-2 block small-label">Motivo de cancelación</label>
+              <textarea
+                rows={4}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ejemplo: ya no podré recogerlo hoy"
+                className="app-input"
+              />
+            </div>
 
-      <div className="mt-6 flex gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setCancelModalOpen(false);
-            setReservationToCancel(null);
-            setCancelReason("");
-          }}
-          className="flex-1 rounded-lg bg-gray-700 px-4 py-3 font-semibold hover:bg-gray-600"
-        >
-          Cerrar
-        </button>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelModalOpen(false);
+                  setReservationToCancel(null);
+                  setCancelReason("");
+                }}
+                className="btn-soft flex-1"
+              >
+                Cerrar
+              </button>
 
-        <button
-          type="button"
-          onClick={handleConfirmCancelReservation}
-          disabled={cancelLoading}
-          className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold hover:bg-red-700 disabled:opacity-60"
-        >
-          {cancelLoading ? "Cancelando..." : "Cancelar reserva"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              <button
+                type="button"
+                onClick={handleConfirmCancelReservation}
+                disabled={cancelLoading}
+                className="btn-danger flex-1 disabled:opacity-60"
+              >
+                {cancelLoading ? "Cancelando..." : "Cancelar reserva"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

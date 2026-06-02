@@ -48,43 +48,43 @@ export default function SignUpPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
+    <main className="app-page px-6 py-10">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold">Crear cuenta</h1>
-          <p className="mt-3 text-gray-400">
+          <h1 className="page-title text-4xl text-center">Crear cuenta</h1>
+          <p className="mt-3 text-center text-base text-muted">
             Elige cómo usarás la plataforma y completa tus datos.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-2xl bg-gray-900 p-6 shadow-lg">
-            <h2 className="mb-5 text-2xl font-semibold">Selecciona tu tipo de cuenta</h2>
+          <section className="app-card p-6 shadow-lg">
+            <h2 className="section-title text-2xl">
+              Selecciona tu tipo de cuenta
+            </h2>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setRole("customer")}
-                className={`rounded-2xl border p-5 text-left transition ${
-                  role === "customer"
-                    ? "border-blue-500 bg-blue-600/10"
-                    : "border-gray-700 bg-gray-800 hover:bg-gray-800/80"
+                className={`card-option text-left ${
+                  role === "customer" ? "card-option-active" : ""
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xl font-semibold">Cliente</span>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="section-title text-xl">Cliente</span>
+
                   {role === "customer" && (
-                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold">
-                      Seleccionado
-                    </span>
+                    <span className="chip-selected">Seleccionado</span>
                   )}
                 </div>
 
-                <p className="text-sm text-gray-300">
-                  Busca productos cercanos en el mapa, compara opciones y realiza reservas.
+                <p className="text-sm leading-7 text-muted">
+                  Busca productos cercanos en el mapa, compara opciones y
+                  realiza reservas.
                 </p>
 
-                <div className="mt-4 space-y-1 text-sm text-gray-400">
+                <div className="mt-4 space-y-2 text-sm text-soft">
                   <p>• Buscar productos</p>
                   <p>• Ver tiendas cercanas</p>
                   <p>• Reservar y cancelar reservas</p>
@@ -94,26 +94,24 @@ export default function SignUpPage() {
               <button
                 type="button"
                 onClick={() => setRole("merchant")}
-                className={`rounded-2xl border p-5 text-left transition ${
-                  role === "merchant"
-                    ? "border-green-500 bg-green-600/10"
-                    : "border-gray-700 bg-gray-800 hover:bg-gray-800/80"
+                className={`card-option text-left ${
+                  role === "merchant" ? "card-option-active" : ""
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xl font-semibold">Vendedor</span>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="section-title text-xl">Vendedor</span>
+
                   {role === "merchant" && (
-                    <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-semibold">
-                      Seleccionado
-                    </span>
+                    <span className="chip-selected">Seleccionado</span>
                   )}
                 </div>
 
-                <p className="text-sm text-gray-300">
-                  Registra tu negocio, administra tu tienda, productos, stock y reservas.
+                <p className="text-sm leading-7 text-muted">
+                  Registra tu negocio, administra tu tienda, productos, stock y
+                  reservas.
                 </p>
 
-                <div className="mt-4 space-y-1 text-sm text-gray-400">
+                <div className="mt-4 space-y-2 text-sm text-soft">
                   <p>• Registrar negocio y tienda</p>
                   <p>• Gestionar productos</p>
                   <p>• Ver reservas del local</p>
@@ -122,12 +120,14 @@ export default function SignUpPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-gray-900 p-6 shadow-lg">
+          <section className="app-card p-6 shadow-lg">
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold">
-                {role === "customer" ? "Registro de cliente" : "Registro de vendedor"}
+              <h2 className="section-title text-2xl">
+                {role === "customer"
+                  ? "Registro de cliente"
+                  : "Registro de vendedor"}
               </h2>
-              <p className="mt-2 text-sm text-gray-400">
+              <p className="mt-2 text-base text-muted">
                 {role === "customer"
                   ? "Crea tu cuenta para buscar y reservar productos."
                   : "Crea tu cuenta para publicar y administrar tu tienda."}
@@ -136,47 +136,45 @@ export default function SignUpPage() {
 
             <form onSubmit={handleSignUp} className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm">Nombre completo</label>
+                <label className="mb-2 block small-label">
+                  Nombre completo
+                </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none focus:border-gray-500"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Correo</label>
+                <label className="mb-2 block small-label">Correo</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none focus:border-gray-500"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Contraseña</label>
+                <label className="mb-2 block small-label">Contraseña</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none focus:border-gray-500"
+                  className="app-input"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full rounded-xl px-4 py-3 font-semibold transition disabled:opacity-60 ${
-                  role === "customer"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-green-600 hover:bg-green-700"
-                }`}
+                className="btn-primary w-full disabled:opacity-60"
               >
                 {loading
                   ? "Registrando..."
@@ -187,14 +185,14 @@ export default function SignUpPage() {
             </form>
 
             {message && (
-              <p className="mt-4 rounded-xl bg-gray-800 p-4 text-sm text-gray-200">
+              <p className="info-box mt-4 text-sm">
                 {message}
               </p>
             )}
 
-            <p className="mt-6 text-sm text-gray-400">
+            <p className="mt-6 text-sm text-muted">
               ¿Ya tienes cuenta?{" "}
-              <Link href="/auth/sign-in" className="text-cyan-400 hover:underline">
+              <Link href="/auth/sign-in" className="link-primary">
                 Inicia sesión
               </Link>
             </p>

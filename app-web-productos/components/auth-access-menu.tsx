@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/client";
+import { signOutCurrentSession } from "../lib/auth/sign-out";
 
 type RoleType = "customer" | "merchant" | "admin" | null;
 
@@ -14,15 +17,18 @@ type AccountState = {
 
 export default function AuthAccessMenu() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+  const profileRequestIdRef = useRef(0);
 
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountState>({
     email: null,
     fullName: null,
     role: null,
   });
 
-  function applySessionUser(user: any | null) {
+  const applySessionUser = useCallback((user: User | null) => {
     if (!user) {
       setAccount({
         email: null,
@@ -37,23 +43,35 @@ export default function AuthAccessMenu() {
       fullName: user.user_metadata?.full_name ?? "Usuario",
       role: (user.user_metadata?.role as RoleType) ?? null,
     });
-  }
+  }, []);
 
-  async function enrichFromProfile(userId: string) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", userId)
-      .maybeSingle();
+  const enrichFromProfile = useCallback(
+    (userId: string) => {
+      const requestId = profileRequestIdRef.current + 1;
+      profileRequestIdRef.current = requestId;
 
-    if (!data) return;
+      window.setTimeout(async () => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name, role")
+          .eq("id", userId)
+          .maybeSingle();
 
-    setAccount((prev) => ({
-      email: prev.email,
-      fullName: data.full_name ?? prev.fullName,
-      role: (data.role as RoleType) ?? prev.role,
-    }));
-  }
+        if (!data || profileRequestIdRef.current !== requestId) return;
+
+        setAccount((prev) => {
+          if (!prev.email) return prev;
+
+          return {
+            email: prev.email,
+            fullName: data.full_name ?? prev.fullName,
+            role: (data.role as RoleType) ?? prev.role,
+          };
+        });
+      }, 0);
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -68,43 +86,49 @@ export default function AuthAccessMenu() {
       const user = session?.user ?? null;
       applySessionUser(user);
 
-      if (user?.id) {
-        await enrichFromProfile(user.id);
-      }
+      if (user?.id) enrichFromProfile(user.id);
     }
 
     loadInitial();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
       const user = session?.user ?? null;
       applySessionUser(user);
 
-      if (user?.id) {
-        await enrichFromProfile(user.id);
-      }
+      if (user?.id) enrichFromProfile(user.id);
     });
 
     return () => {
       mounted = false;
+      profileRequestIdRef.current += 1;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [applySessionUser, enrichFromProfile, supabase]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    if (signingOut) return;
 
+    setSigningOut(true);
     setOpen(false);
+    profileRequestIdRef.current += 1;
     setAccount({
       email: null,
       fullName: null,
       role: null,
     });
 
-    window.location.href = `/?logout=${Date.now()}`;
+    try {
+      await signOutCurrentSession(supabase);
+    } catch (error) {
+      console.error("No se pudo cerrar sesion.", error);
+    } finally {
+      router.replace("/");
+      router.refresh();
+    }
   }
 
   const isLoggedIn = !!account.email;
@@ -113,19 +137,30 @@ export default function AuthAccessMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-lg bg-gray-800 px-4 py-2 font-semibold hover:bg-gray-700"
+        className="rounded-2xl px-5 py-3 font-semibold text-white shadow-sm transition hover:brightness-95"
+        style={{
+          background: "linear-gradient(135deg, #7900f3, #b68aff)",
+        }}
       >
         {isLoggedIn ? "Mi cuenta" : "Acceso"}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-[9999] mt-2 w-72 rounded-xl border border-gray-700 bg-gray-900 p-2 shadow-xl">
+        <div
+          className="absolute right-0 z-[9999] mt-3 w-72 rounded-3xl p-2 shadow-xl"
+          style={{
+            background: "#ffffff",
+            color: "#2c2f30",
+            boxShadow: "0 12px 40px rgba(44, 47, 48, 0.10)",
+          }}
+        >
           {!isLoggedIn ? (
             <>
               <Link
                 href="/auth/sign-in"
                 onClick={() => setOpen(false)}
-                className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                style={{ color: "#2c2f30" }}
               >
                 Iniciar sesión
               </Link>
@@ -133,19 +168,31 @@ export default function AuthAccessMenu() {
               <Link
                 href="/auth/sign-up"
                 onClick={() => setOpen(false)}
-                className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                style={{ color: "#2c2f30" }}
               >
                 Registrarse
               </Link>
             </>
           ) : (
             <>
-              <div className="mb-2 rounded-lg bg-gray-800 p-4">
-                <p className="font-semibold text-white">
+              <div
+                className="mb-2 rounded-2xl p-4"
+                style={{ background: "#eff1f2" }}
+              >
+                <p className="font-semibold" style={{ color: "#2c2f30" }}>
                   {account.fullName || "Usuario"}
                 </p>
-                <p className="mt-1 text-sm text-gray-300">{account.email}</p>
-                <p className="mt-2 text-xs uppercase tracking-wide text-gray-400">
+                <p
+                  className="mt-1 text-sm"
+                  style={{ color: "#66707a", wordBreak: "break-word" }}
+                >
+                  {account.email}
+                </p>
+                <p
+                  className="mt-2 text-xs uppercase tracking-wide"
+                  style={{ color: "#7900f3" }}
+                >
                   {account.role === "customer"
                     ? "Cliente"
                     : account.role === "merchant"
@@ -157,7 +204,8 @@ export default function AuthAccessMenu() {
               <Link
                 href="/profile"
                 onClick={() => setOpen(false)}
-                className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                style={{ color: "#2c2f30" }}
               >
                 Ver perfil
               </Link>
@@ -167,9 +215,10 @@ export default function AuthAccessMenu() {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    window.location.href = "/customer/reservations";
+                    router.push("/customer/reservations");
                   }}
-                  className="block w-full rounded-lg px-4 py-3 text-left hover:bg-gray-800"
+                  className="block w-full rounded-2xl px-4 py-3 text-left font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                  style={{ color: "#2c2f30" }}
                 >
                   Mis reservas
                 </button>
@@ -180,7 +229,8 @@ export default function AuthAccessMenu() {
                   <Link
                     href="/dashboard"
                     onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                    className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                    style={{ color: "#2c2f30" }}
                   >
                     Dashboard
                   </Link>
@@ -188,7 +238,8 @@ export default function AuthAccessMenu() {
                   <Link
                     href="/merchant/products"
                     onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                    className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                    style={{ color: "#2c2f30" }}
                   >
                     Mis productos
                   </Link>
@@ -196,21 +247,27 @@ export default function AuthAccessMenu() {
                   <Link
                     href="/merchant/reservations"
                     onClick={() => setOpen(false)}
-                    className="block rounded-lg px-4 py-3 hover:bg-gray-800"
+                    className="block rounded-2xl px-4 py-3 font-medium transition hover:bg-[rgba(121,0,243,0.08)]"
+                    style={{ color: "#2c2f30" }}
                   >
                     Reservas del local
                   </Link>
                 </>
               )}
 
-              <div className="my-2 border-t border-gray-700" />
+              <div
+                className="my-2"
+                style={{ borderTop: "1px solid rgba(44,47,48,0.10)" }}
+              />
 
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="block w-full rounded-lg px-4 py-3 text-left text-red-300 hover:bg-gray-800"
+                disabled={signingOut}
+                className="block w-full rounded-2xl px-4 py-3 text-left font-medium transition hover:bg-[rgba(220,38,38,0.08)]"
+                style={{ color: "#dc2626" }}
               >
-                Cerrar sesión
+                {signingOut ? "Cerrando..." : "Cerrar sesión"}
               </button>
             </>
           )}

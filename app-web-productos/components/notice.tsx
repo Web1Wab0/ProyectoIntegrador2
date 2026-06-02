@@ -7,13 +7,16 @@ type Props = {
 
 export default function Notice({ type, message }: Props) {
   const styles = {
-    success: "bg-green-900/40 border-green-600 text-green-200",
-    warning: "bg-yellow-900/40 border-yellow-600 text-yellow-200",
-    error: "bg-red-900/40 border-red-600 text-red-200",
+    success:
+      "bg-[rgba(0,100,122,0.10)] text-[var(--secondary)]",
+    warning:
+      "bg-[rgba(217,119,6,0.10)] text-[var(--warning)]",
+    error:
+      "bg-[rgba(220,38,38,0.10)] text-[var(--danger)]",
   };
 
   return (
-    <div className={`rounded-lg border p-4 text-sm ${styles[type]}`}>
+    <div className={`rounded-2xl p-4 text-sm font-medium ${styles[type]}`}>
       {message}
     </div>
   );

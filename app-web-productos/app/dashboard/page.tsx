@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
+import { signOutCurrentSession } from "../../lib/auth/sign-out";
 
 type UserData = {
   email: string;
 };
 
 export default function DashboardPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -36,64 +38,74 @@ export default function DashboardPage() {
   }, [router, supabase]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/auth/sign-in");
-    router.refresh();
+    if (signingOut) return;
+
+    setSigningOut(true);
+
+    try {
+      await signOutCurrentSession(supabase);
+    } catch (error) {
+      console.error("No se pudo cerrar sesion.", error);
+    } finally {
+      router.replace("/");
+      router.refresh();
+    }
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-4xl rounded-2xl bg-gray-900 p-8 shadow-lg">
-        <h1 className="mb-3 text-3xl font-bold">Dashboard del local</h1>
-        <p className="mb-8 text-gray-300">
-          Sesión iniciada con: <strong>{user?.email}</strong>
+    <main className="app-page">
+      <div className="mx-auto max-w-4xl app-card p-8 shadow-lg">
+        <h1 className="page-title text-3xl">Dashboard del local</h1>
+        <p className="mt-3 text-base text-muted">
+          Sesión iniciada con: <span className="font-semibold text-[var(--on-surface)]">{user?.email}</span>
         </p>
 
-        <div className="grid gap-4 md:grid-cols-2">
-  <Link
-    href="/merchant/setup"
-    className="rounded-xl bg-gray-800 p-5 hover:bg-gray-700"
-  >
-    <h2 className="mb-2 text-xl font-semibold">Configurar negocio</h2>
-    <p className="text-gray-300">
-      Crear o editar datos del negocio y la tienda.
-    </p>
-  </Link>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <Link
+            href="/merchant/setup"
+            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8]"
+          >
+            <h2 className="section-title text-xl">Configurar negocio</h2>
+            <p className="mt-2 text-muted">
+              Crear o editar datos del negocio y la tienda.
+            </p>
+          </Link>
 
-  <Link
-    href="/merchant/products"
-    className="rounded-xl bg-gray-800 p-5 hover:bg-gray-700"
-  >
-    <h2 className="mb-2 text-xl font-semibold">Productos</h2>
-    <p className="text-gray-300">
-      Crear, editar y eliminar productos de tu tienda.
-    </p>
-  </Link>
+          <Link
+            href="/merchant/products"
+            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8]"
+          >
+            <h2 className="section-title text-xl">Productos</h2>
+            <p className="mt-2 text-muted">
+              Crear, editar y eliminar productos de tu tienda.
+            </p>
+          </Link>
 
-  <Link
-    href="/merchant/reservations"
-    className="rounded-xl bg-gray-800 p-5 hover:bg-gray-700 md:col-span-2"
-  >
-    <h2 className="mb-2 text-xl font-semibold">Reservas</h2>
-    <p className="text-gray-300">
-      Ver, aprobar, marcar listo o cancelar reservas del local.
-    </p>
-  </Link>
-</div>
+          <Link
+            href="/merchant/reservations"
+            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8] md:col-span-2"
+          >
+            <h2 className="section-title text-xl">Reservas</h2>
+            <p className="mt-2 text-muted">
+              Ver, aprobar, marcar listo o cancelar reservas del local.
+            </p>
+          </Link>
+        </div>
 
         <button
           onClick={handleSignOut}
-          className="mt-8 rounded-lg bg-red-600 px-5 py-3 font-semibold hover:bg-red-700"
+          disabled={signingOut}
+          className="btn-danger mt-8 disabled:opacity-60"
         >
-          Cerrar sesión
+          {signingOut ? "Cerrando..." : "Cerrar sesión"}
         </button>
       </div>
     </main>

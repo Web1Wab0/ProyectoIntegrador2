@@ -1,9 +1,27 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
+import {
+  normalizeOpeningHours,
+  STORE_DAYS,
+  type StoreOpeningHours,
+  validateOpeningHours,
+} from "../../../lib/store-hours";
+import Notice from "../../../components/notice";
+
+const StoreLocationPicker = dynamic(
+  () => import("../../../components/store-location-picker"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="info-box">Cargando selector de ubicacion...</div>
+    ),
+  }
+);
 
 type BusinessRow = {
   id: string;
@@ -21,10 +39,18 @@ type StoreRow = {
   country: string | null;
   latitude: number;
   longitude: number;
+  opening_hours?: unknown;
+};
+
+type AddressSelection = {
+  addressText?: string;
+  district?: string;
+  city?: string;
+  country?: string;
 };
 
 export default function MerchantSetupPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -45,6 +71,55 @@ export default function MerchantSetupPage() {
   const [country, setCountry] = useState("Perú");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [openingHours, setOpeningHours] = useState<StoreOpeningHours>(() =>
+    normalizeOpeningHours(null)
+  );
+
+  const mapLatitude = Number(latitude);
+  const mapLongitude = Number(longitude);
+  const hasValidMapCoordinates =
+    !Number.isNaN(mapLatitude) &&
+    !Number.isNaN(mapLongitude) &&
+    mapLatitude >= -90 &&
+    mapLatitude <= 90 &&
+    mapLongitude >= -180 &&
+    mapLongitude <= 180;
+
+  function handleLocationChange(nextLatitude: number, nextLongitude: number) {
+    setLatitude(nextLatitude.toFixed(7));
+    setLongitude(nextLongitude.toFixed(7));
+  }
+
+  function handleAddressSelect(selection: AddressSelection) {
+    if (selection.addressText) {
+      setAddressText(selection.addressText);
+    }
+
+    if (selection.district) {
+      setDistrict(selection.district);
+    }
+
+    if (selection.city) {
+      setCity(selection.city);
+    }
+
+    if (selection.country) {
+      setCountry(selection.country);
+    }
+  }
+
+  function updateOpeningDay(
+    dayKey: string,
+    updates: Partial<StoreOpeningHours[string]>
+  ) {
+    setOpeningHours((prev) => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        ...updates,
+      },
+    }));
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -76,14 +151,25 @@ export default function MerchantSetupPage() {
         setRuc(businessData.ruc ?? "");
         setDescription(businessData.description ?? "");
 
-        const { data: storeData, error: storeError } = await supabase
+        const storeWithHours = await supabase
           .from("stores")
           .select(
-            "id, store_name, address_text, district, city, country, latitude, longitude"
+            "id, store_name, address_text, district, city, country, latitude, longitude, opening_hours"
           )
           .eq("business_id", businessData.id)
           .limit(1)
           .maybeSingle<StoreRow>();
+
+        const { data: storeData, error: storeError } = storeWithHours.error
+          ? await supabase
+              .from("stores")
+              .select(
+                "id, store_name, address_text, district, city, country, latitude, longitude"
+              )
+              .eq("business_id", businessData.id)
+              .limit(1)
+              .maybeSingle<StoreRow>()
+          : storeWithHours;
 
         if (storeError) {
           setMessage(storeError.message);
@@ -98,8 +184,11 @@ export default function MerchantSetupPage() {
           setDistrict(storeData.district ?? "");
           setCity(storeData.city ?? "Ica");
           setCountry(storeData.country ?? "Perú");
-          setLatitude(String(storeData.latitude ?? ""));
-          setLongitude(String(storeData.longitude ?? ""));
+          setOpeningHours(normalizeOpeningHours(storeData.opening_hours));
+          handleLocationChange(
+            Number(storeData.latitude ?? 0),
+            Number(storeData.longitude ?? 0)
+          );
         }
       }
 
@@ -119,8 +208,10 @@ export default function MerchantSetupPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLatitude(String(position.coords.latitude));
-        setLongitude(String(position.coords.longitude));
+        handleLocationChange(
+          position.coords.latitude,
+          position.coords.longitude
+        );
         setMessage("Ubicación cargada correctamente.");
       },
       (error) => {
@@ -143,6 +234,22 @@ export default function MerchantSetupPage() {
       return;
     }
 
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setMessage(
+        "La latitud debe estar entre -90 y 90, y la longitud entre -180 y 180."
+      );
+      setSaving(false);
+      return;
+    }
+
+    const openingHoursError = validateOpeningHours(openingHours);
+
+    if (openingHoursError) {
+      setMessage(openingHoursError);
+      setSaving(false);
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -157,16 +264,17 @@ export default function MerchantSetupPage() {
     let currentBusinessId = businessId;
 
     if (!currentBusinessId) {
-      const { data: createdBusiness, error: businessInsertError } = await supabase
-        .from("businesses")
-        .insert({
-          owner_user_id: user.id,
-          business_name: businessName,
-          ruc: ruc || null,
-          description: description || null,
-        })
-        .select("id")
-        .single();
+      const { data: createdBusiness, error: businessInsertError } =
+        await supabase
+          .from("businesses")
+          .insert({
+            owner_user_id: user.id,
+            business_name: businessName,
+            ruc: ruc || null,
+            description: description || null,
+          })
+          .select("id")
+          .single();
 
       if (businessInsertError) {
         setMessage(businessInsertError.message);
@@ -194,27 +302,25 @@ export default function MerchantSetupPage() {
     }
 
     if (!storeId) {
-      const { error: storeInsertError } = await supabase
-  .from("stores")
-  .insert({
-    business_id: currentBusinessId,
-    store_name: storeName,
-    address_text: addressText,
-    district: district || null,
-    city: city || "Ica",
-    country: country || "Perú",
-    latitude: lat,
-    longitude: lng,
-    status: "pending",
-    is_active: true,
-  });
+      const { error: storeInsertError } = await supabase.from("stores").insert({
+        business_id: currentBusinessId,
+        store_name: storeName,
+        address_text: addressText,
+        district: district || null,
+        city: city || "Ica",
+        country: country || "Perú",
+        latitude: lat,
+        longitude: lng,
+        opening_hours: openingHours,
+        status: "pending",
+        is_active: true,
+      });
 
-if (storeInsertError) {
-  setMessage(storeInsertError.message);
-  setSaving(false);
-  return;
-}
-
+      if (storeInsertError) {
+        setMessage(storeInsertError.message);
+        setSaving(false);
+        return;
+      }
     } else {
       const { error: storeUpdateError } = await supabase
         .from("stores")
@@ -226,6 +332,7 @@ if (storeInsertError) {
           country: country || "Perú",
           latitude: lat,
           longitude: lng,
+          opening_hours: openingHours,
         })
         .eq("id", storeId);
 
@@ -237,129 +344,140 @@ if (storeInsertError) {
     }
 
     setMessage("Negocio y tienda guardados correctamente.");
-setSaving(false);
-router.refresh();
-return;
+    setSaving(false);
+    router.refresh();
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando datos del local...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white px-6 py-10">
-      <div className="mx-auto max-w-3xl rounded-2xl bg-gray-900 p-8 shadow-lg">
+    <main className="app-page">
+      <div className="mx-auto max-w-3xl app-card p-8 shadow-lg">
         <div className="mb-8 flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Configuración del local</h1>
-            <p className="mt-2 text-gray-400">
+            <h1 className="page-title text-3xl">Configuración del local</h1>
+            <p className="mt-2 text-muted">
               Registra tu negocio y la ubicación de tu tienda.
             </p>
           </div>
 
-          <Link
-            href="/dashboard"
-            className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium hover:bg-gray-700"
-          >
+          <Link href="/dashboard" className="btn-soft px-4 py-2 text-sm">
             Volver
           </Link>
         </div>
 
+        {message && (
+          <div className="mb-6">
+            <Notice
+              type={
+                message.toLowerCase().includes("correctamente")
+                  ? "success"
+                  : message.toLowerCase().includes("obteniendo")
+                  ? "warning"
+                  : "error"
+              }
+              message={message}
+            />
+          </div>
+        )}
+
         <form onSubmit={handleSave} className="space-y-8">
-          <section className="rounded-xl bg-gray-800 p-5">
-            <h2 className="mb-4 text-xl font-semibold">Datos del negocio</h2>
+          <section className="app-card-soft p-5">
+            <h2 className="section-title mb-4 text-xl">Datos del negocio</h2>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm">Nombre del negocio</label>
+                <label className="mb-2 block small-label">Nombre del negocio</label>
                 <input
                   type="text"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">RUC</label>
+                <label className="mb-2 block small-label">RUC</label>
                 <input
                   type="text"
                   value={ruc}
                   onChange={(e) => setRuc(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm">Descripción</label>
+                <label className="mb-2 block small-label">Descripción</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  rows={4}
+                  className="app-input"
                 />
               </div>
             </div>
           </section>
 
-          <section className="rounded-xl bg-gray-800 p-5">
-            <h2 className="mb-4 text-xl font-semibold">Datos de la tienda</h2>
+          <section className="app-card-soft p-5">
+            <h2 className="section-title mb-4 text-xl">Datos de la tienda</h2>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm">Nombre de la tienda</label>
+                <label className="mb-2 block small-label">Nombre de la tienda</label>
                 <input
                   type="text"
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm">Dirección</label>
+                <label className="mb-2 block small-label">Dirección</label>
                 <input
                   type="text"
                   value={addressText}
                   onChange={(e) => setAddressText(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Distrito</label>
+                <label className="mb-2 block small-label">Distrito</label>
                 <input
                   type="text"
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Ciudad</label>
+                <label className="mb-2 block small-label">Ciudad</label>
                 <input
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">País</label>
+                <label className="mb-2 block small-label">País</label>
                 <input
                   type="text"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
@@ -367,50 +485,118 @@ return;
                 <button
                   type="button"
                   onClick={handleUseCurrentLocation}
-                  className="rounded-lg bg-indigo-600 px-4 py-3 font-semibold hover:bg-indigo-700"
+                  className="btn-secondary"
                 >
                   Usar mi ubicación actual
                 </button>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm">Latitud</label>
-                <input
-                  type="text"
-                  value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+              <div className="md:col-span-2">
+                <label className="mb-2 block small-label">
+                  Buscar o seleccionar ubicaciÃ³n en el mapa
+                </label>
+                <StoreLocationPicker
+                  latitude={hasValidMapCoordinates ? mapLatitude : null}
+                  longitude={hasValidMapCoordinates ? mapLongitude : null}
+                  city={city}
+                  country={country}
+                  onLocationChange={handleLocationChange}
+                  onAddressSelect={handleAddressSelect}
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Longitud</label>
+                <label className="mb-2 block small-label">Latitud</label>
+                <input
+                  type="text"
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  className="app-input"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block small-label">Longitud</label>
                 <input
                   type="text"
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
+            </div>
+          </section>
+
+          <section className="app-card-soft p-5">
+            <h2 className="section-title mb-4 text-xl">
+              Horario de atencion
+            </h2>
+
+            <div className="space-y-3">
+              {STORE_DAYS.map((day) => {
+                const dayHours = openingHours[day.key];
+
+                return (
+                  <div
+                    key={day.key}
+                    className="grid gap-3 rounded-2xl bg-white/60 p-4 md:grid-cols-[120px_120px_1fr_1fr]"
+                  >
+                    <div className="font-semibold text-[var(--on-surface)]">
+                      {day.label}
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-muted">
+                      <input
+                        type="checkbox"
+                        checked={dayHours.closed}
+                        onChange={(e) =>
+                          updateOpeningDay(day.key, {
+                            closed: e.target.checked,
+                          })
+                        }
+                      />
+                      Cerrado
+                    </label>
+
+                    <div>
+                      <label className="mb-1 block small-label">Apertura</label>
+                      <input
+                        type="time"
+                        value={dayHours.open}
+                        disabled={dayHours.closed}
+                        onChange={(e) =>
+                          updateOpeningDay(day.key, { open: e.target.value })
+                        }
+                        className="app-input disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block small-label">Cierre</label>
+                      <input
+                        type="time"
+                        value={dayHours.close}
+                        disabled={dayHours.closed}
+                        onChange={(e) =>
+                          updateOpeningDay(day.key, { close: e.target.value })
+                        }
+                        className="app-input disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-lg bg-green-600 px-5 py-3 font-semibold hover:bg-green-700 disabled:opacity-60"
+            className="btn-primary w-full disabled:opacity-60"
           >
             {saving ? "Guardando..." : "Guardar negocio y tienda"}
           </button>
         </form>
-
-        {message && (
-          <p className="mt-5 rounded-lg bg-gray-800 p-4 text-sm text-gray-200">
-            {message}
-          </p>
-        )}
       </div>
     </main>
   );

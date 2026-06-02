@@ -40,7 +40,59 @@ type ReservationRow = {
 type CustomerInfo = {
   full_name: string | null;
   phone: string | null;
+  email: string | null;
 };
+
+type MaybeArray<T> = T | T[] | null;
+type ProductRelation = NonNullable<
+  NonNullable<ReservationItem["store_products"]>["products"]
+>;
+type StoreProductRelation = Omit<
+  NonNullable<ReservationItem["store_products"]>,
+  "products"
+> & {
+  products: MaybeArray<ProductRelation>;
+};
+type RawReservationItem = Omit<ReservationItem, "store_products"> & {
+  store_products: MaybeArray<StoreProductRelation>;
+};
+type RawReservationRow = Omit<ReservationRow, "reservation_items"> & {
+  reservation_items: RawReservationItem[] | null;
+};
+type MerchantCustomerRow = {
+  customer_user_id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+function firstOrNull<T>(value: MaybeArray<T> | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeReservationItem(item: RawReservationItem): ReservationItem {
+  const storeProduct = firstOrNull(item.store_products);
+
+  return {
+    ...item,
+    store_products: storeProduct
+      ? {
+          ...storeProduct,
+          products: firstOrNull(storeProduct.products),
+        }
+      : null,
+  };
+}
+
+function normalizeReservationRow(row: RawReservationRow): ReservationRow {
+  return {
+    ...row,
+    reservation_items: (row.reservation_items ?? []).map(
+      normalizeReservationItem
+    ),
+  };
+}
 
 export default function MerchantReservationsPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -49,9 +101,9 @@ export default function MerchantReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [storeId, setStoreId] = useState("");
   const [reservations, setReservations] = useState<ReservationRow[]>([]);
-  const [customersById, setCustomersById] = useState<Record<string, CustomerInfo>>(
-  {}
-);
+  const [customersById, setCustomersById] = useState<
+    Record<string, CustomerInfo>
+  >({});
   const [messagesById, setMessagesById] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{
     type: "success" | "warning" | "error";
@@ -160,7 +212,7 @@ export default function MerchantReservationsPage() {
         return;
       }
 
-      const rows = (data as ReservationRow[]) ?? [];
+      const rows = (data ?? []).map(normalizeReservationRow);
       setReservations(rows);
 
       const initialMessages: Record<string, string> = {};
@@ -170,25 +222,27 @@ export default function MerchantReservationsPage() {
       setMessagesById(initialMessages);
 
       const { data: customerRows, error: customerError } = await supabase.rpc(
-  "get_merchant_reservation_customers",
-  {
-    p_store_id: storeData.id,
-  }
-);
+        "get_merchant_reservation_customers",
+        {
+          p_store_id: storeData.id,
+        }
+      );
 
-if (!customerError && customerRows) {
-  const customerMap: Record<string, CustomerInfo> = {};
+      if (!customerError && customerRows) {
+        const customerMap: Record<string, CustomerInfo> = {};
 
-  (customerRows as any[]).forEach((row) => {
-    customerMap[row.customer_user_id] = {
-      full_name: row.full_name ?? null,
-      phone: row.phone ?? null,
-      email: row.email ?? null,
-    };
-  });
+        const typedCustomerRows = customerRows as MerchantCustomerRow[];
 
-  setCustomersById(customerMap);
-}
+        typedCustomerRows.forEach((row) => {
+          customerMap[row.customer_user_id] = {
+            full_name: row.full_name ?? null,
+            phone: row.phone ?? null,
+            email: row.email ?? null,
+          };
+        });
+
+        setCustomersById(customerMap);
+      }
 
       setLoading(false);
     }
@@ -293,28 +347,25 @@ if (!customerError && customerRows) {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando reservas...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
+    <main className="app-page px-6 py-10">
       <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Reservas del local</h1>
-            <p className="mt-2 text-gray-400">
+            <h1 className="page-title text-3xl">Reservas del local</h1>
+            <p className="mt-2 text-base text-muted">
               Aprueba, marca listo o cancela reservas con un mensaje para el
               cliente.
             </p>
           </div>
 
-          <Link
-            href="/dashboard"
-            className="rounded-lg bg-gray-800 px-4 py-2 font-semibold hover:bg-gray-700"
-          >
+          <Link href="/dashboard" className="btn-soft">
             Volver al dashboard
           </Link>
         </div>
@@ -322,11 +373,11 @@ if (!customerError && customerRows) {
         {notice && <Notice type={notice.type} message={notice.message} />}
 
         {!storeId ? (
-          <div className="mt-4 rounded-2xl bg-gray-900 p-6 shadow-lg">
+          <div className="mt-4 app-card p-6 shadow-lg">
             No se encontró una tienda asociada.
           </div>
         ) : reservations.length === 0 ? (
-          <div className="mt-4 rounded-2xl bg-gray-900 p-6 shadow-lg">
+          <div className="mt-4 app-card p-6 shadow-lg">
             No hay reservas todavía.
           </div>
         ) : (
@@ -335,29 +386,26 @@ if (!customerError && customerRows) {
               const customer = customersById[item.customer_user_id];
 
               return (
-                <article
-                  key={item.id}
-                  className="rounded-2xl bg-gray-900 p-6 shadow-lg"
-                >
+                <article key={item.id} className="app-card p-6 shadow-lg">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold">
+                      <h2 className="section-title text-xl">
                         Código de recojo: {item.pickup_code}
                       </h2>
-                      <div className="mt-2 space-y-1 text-sm text-gray-300">
+                      <div className="mt-2 space-y-1 text-sm text-muted">
                         <p>
                           Estado:{" "}
                           <span
                             className={`font-semibold ${
                               item.status === "pending"
-                                ? "text-yellow-400"
+                                ? "text-amber-500"
                                 : item.status === "confirmed"
-                                ? "text-blue-400"
+                                ? "text-sky-600"
                                 : item.status === "ready"
-                                ? "text-indigo-400"
+                                ? "text-indigo-600"
                                 : item.status === "completed"
-                                ? "text-green-400"
-                                : "text-red-400"
+                                ? "text-emerald-600"
+                                : "text-red-600"
                             }`}
                           >
                             {item.status}
@@ -377,61 +425,60 @@ if (!customerError && customerRows) {
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-xl bg-gray-800 p-4">
-  <p className="text-sm text-gray-400">Cliente</p>
-  <p className="mt-1 font-semibold text-white">
-    {customer?.full_name || "Cliente sin nombre"}
-  </p>
-  <p className="mt-1 text-sm text-gray-300">
-    Correo: {customer?.email || "No registrado"}
-  </p>
-  <p className="mt-1 text-sm text-gray-300">
-    Teléfono: {customer?.phone || "No registrado"}
-  </p>
-</div>
+                  <div className="mt-4 app-card-soft p-4">
+                    <p className="text-sm text-muted">Cliente</p>
+                    <p className="mt-1 font-semibold text-[var(--on-surface)]">
+                      {customer?.full_name || "Cliente sin nombre"}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      Correo: {customer?.email || "No registrado"}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      Teléfono: {customer?.phone || "No registrado"}
+                    </p>
+                  </div>
 
                   {item.notes && (
-                    <div className="mt-4 rounded-xl bg-gray-800 p-4">
-                      <p className="text-sm text-gray-400">Nota del cliente</p>
-                      <p className="mt-1 text-sm text-white">{item.notes}</p>
+                    <div className="mt-4 app-card-soft p-4">
+                      <p className="text-sm text-muted">Nota del cliente</p>
+                      <p className="mt-1 text-sm text-[var(--on-surface)]">
+                        {item.notes}
+                      </p>
                     </div>
                   )}
 
                   {item.customer_cancel_reason && (
-                    <div className="mt-4 rounded-xl bg-gray-800 p-4">
-                      <p className="text-sm text-gray-400">
+                    <div className="mt-4 app-card-soft p-4">
+                      <p className="text-sm text-muted">
                         Motivo de cancelación del cliente
                       </p>
-                      <p className="mt-1 text-sm text-white">
+                      <p className="mt-1 text-sm text-[var(--on-surface)]">
                         {item.customer_cancel_reason}
                       </p>
                     </div>
                   )}
 
                   <div className="mt-4">
-                    <h3 className="mb-3 text-lg font-semibold">
+                    <h3 className="section-title mb-3 text-lg">
                       Productos de la reserva
                     </h3>
                     <div className="space-y-3">
                       {item.reservation_items.map((detail) => (
-                        <div
-                          key={detail.id}
-                          className="rounded-xl bg-gray-800 p-4"
-                        >
+                        <div key={detail.id} className="app-card-soft p-4">
                           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                             <div>
-                              <p className="font-semibold">
+                              <p className="font-semibold text-[var(--on-surface)]">
                                 {detail.store_products?.products?.product_name ||
                                   "Producto"}
                               </p>
-                              <p className="text-sm text-gray-400">
+                              <p className="text-sm text-muted">
                                 Marca:{" "}
                                 {detail.store_products?.products?.brand ||
                                   "Sin marca"}
                               </p>
                             </div>
 
-                            <div className="text-sm text-gray-300">
+                            <div className="text-sm text-muted">
                               <p>Cantidad: {detail.quantity}</p>
                               <p>
                                 Precio unitario: S/{" "}
@@ -449,7 +496,7 @@ if (!customerError && customerRows) {
                   </div>
 
                   <div className="mt-4">
-                    <label className="mb-2 block text-sm text-gray-400">
+                    <label className="mb-2 block small-label">
                       Mensaje para el cliente
                     </label>
                     <textarea
@@ -462,7 +509,7 @@ if (!customerError && customerRows) {
                         }))
                       }
                       placeholder="Ejemplo: tu reserva fue aprobada, puedes recogerla hoy..."
-                      className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
+                      className="app-input"
                     />
                   </div>
 
@@ -470,7 +517,7 @@ if (!customerError && customerRows) {
                     {item.status === "pending" && (
                       <button
                         onClick={() => handleChangeStatus(item.id, "confirmed")}
-                        className="rounded-lg bg-blue-600 px-4 py-2 font-semibold hover:bg-blue-700"
+                        className="btn-primary"
                       >
                         Aprobar
                       </button>
@@ -480,7 +527,7 @@ if (!customerError && customerRows) {
                       item.status === "confirmed") && (
                       <button
                         onClick={() => handleChangeStatus(item.id, "ready")}
-                        className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold hover:bg-indigo-700"
+                        className="btn-secondary"
                       >
                         Marcar listo
                       </button>
@@ -489,7 +536,7 @@ if (!customerError && customerRows) {
                     {item.status === "ready" && (
                       <button
                         onClick={() => handleChangeStatus(item.id, "completed")}
-                        className="rounded-lg bg-green-600 px-4 py-2 font-semibold hover:bg-green-700"
+                        className="btn-secondary"
                       >
                         Completar entrega
                       </button>
@@ -499,7 +546,7 @@ if (!customerError && customerRows) {
                       item.status !== "cancelled" && (
                         <button
                           onClick={() => openCancelModal(item.id)}
-                          className="rounded-lg bg-red-600 px-4 py-2 font-semibold hover:bg-red-700"
+                          className="btn-danger"
                         >
                           Cancelar
                         </button>
@@ -513,15 +560,15 @@ if (!customerError && customerRows) {
       </div>
 
       {cancelModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-gray-900 p-6 shadow-xl">
-            <h2 className="text-2xl font-bold">Cancelar reserva</h2>
-            <p className="mt-2 text-sm text-gray-400">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md app-card p-6 shadow-xl">
+            <h2 className="section-title text-2xl">Cancelar reserva</h2>
+            <p className="mt-2 text-sm text-muted">
               Escribe el motivo de cancelación para que el cliente pueda verlo.
             </p>
 
             <div className="mt-4">
-              <label className="mb-2 block text-sm text-gray-400">
+              <label className="mb-2 block small-label">
                 Motivo de cancelación
               </label>
               <textarea
@@ -529,7 +576,7 @@ if (!customerError && customerRows) {
                 value={merchantCancelMessage}
                 onChange={(e) => setMerchantCancelMessage(e.target.value)}
                 placeholder="Ejemplo: el producto ya no está disponible"
-                className="w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
 
@@ -541,7 +588,7 @@ if (!customerError && customerRows) {
                   setReservationToCancel(null);
                   setMerchantCancelMessage("");
                 }}
-                className="flex-1 rounded-lg bg-gray-700 px-4 py-3 font-semibold hover:bg-gray-600"
+                className="btn-soft flex-1"
               >
                 Cerrar
               </button>
@@ -550,7 +597,7 @@ if (!customerError && customerRows) {
                 type="button"
                 onClick={handleConfirmMerchantCancel}
                 disabled={cancelLoading}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold hover:bg-red-700 disabled:opacity-60"
+                className="btn-danger flex-1 disabled:opacity-60"
               >
                 {cancelLoading ? "Cancelando..." : "Cancelar reserva"}
               </button>

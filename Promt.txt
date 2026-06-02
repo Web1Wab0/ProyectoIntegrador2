@@ -1,0 +1,459 @@
+Quiero que me ayudes a desarrollar, documentar y estructurar un sistema completo llamado “AhorraPe”.
+
+La idea general del proyecto es crear una solución tecnológica multiplataforma que permita a los usuarios buscar un producto específico y encontrar en qué tiendas cercanas está disponible, mostrando su ubicación en un mapa, precio, stock y distancia respecto a la ubicación del usuario. El sistema debe ayudar al cliente a ahorrar tiempo y dinero, y al mismo tiempo dar visibilidad digital a bodegas, minimarkets y pequeños negocios locales.
+
+El proyecto no debe ser solo local. Todo debe estar conectado a una base de datos centralizada en la nube y desplegado en un hosting real para poder ser probado por el docente y por usuarios externos.
+
+==================================================
+1. NOMBRE DEL PROYECTO
+==================================================
+
+Nombre: AhorraPe
+
+Concepto:
+AhorraPe es una plataforma que conecta clientes con negocios locales cercanos para facilitar la búsqueda, comparación y reserva de productos de consumo diario. El sistema usa geolocalización GPS, mapa interactivo, autenticación por roles, reservas y gestión de inventario.
+
+==================================================
+2. PLATAFORMAS DEL SISTEMA
+==================================================
+
+El sistema está compuesto por 3 programas conectados a una misma base de datos en la nube:
+
+A. Aplicación móvil
+B. Página web
+C. Aplicación de escritorio
+
+Todas las plataformas deben compartir:
+- la misma base de datos
+- la misma autenticación
+- la misma lógica de negocio
+- el mismo inventario
+- las mismas reservas
+
+==================================================
+3. FUNCIÓN DE CADA PLATAFORMA
+==================================================
+
+-----------------------------------
+A. APP MÓVIL
+-----------------------------------
+
+La app móvil estará enfocada en los clientes que desean buscar productos.
+
+Objetivo:
+Permitir que una persona busque un producto desde su celular usando su ubicación actual y visualice las tiendas cercanas donde está disponible.
+
+Funciones principales:
+- usar GPS del dispositivo
+- obtener la ubicación del usuario
+- mostrar un mapa con los negocios cercanos
+- buscar productos por nombre
+- mostrar:
+  - nombre del producto
+  - descripción
+  - precio
+  - stock/disponibilidad
+  - imagen
+  - nombre del local
+  - distancia respecto al usuario
+- permitir reservar productos
+- permitir ver el historial de reservas
+- permitir cancelar reservas pendientes
+- permitir ver mensajes del vendedor
+- permitir ver y editar perfil del cliente
+- permitir registrar teléfono del cliente
+- permitir elegir fecha y hora de recojo antes de confirmar reserva
+
+Restricciones:
+- la app móvil será solo para clientes
+- no gestionará productos ni tiendas
+- no administrará reservas del vendedor
+- funcionará inicialmente en Android
+
+Tecnología sugerida:
+- Kotlin
+- Jetpack Compose
+- Supabase como backend
+
+-----------------------------------
+B. PÁGINA WEB
+-----------------------------------
+
+La web será una plataforma híbrida.
+
+Objetivo:
+Servir tanto para clientes como para vendedores, dependiendo del rol del usuario.
+
+Funciones como cliente:
+- abrir la página principal
+- permitir búsqueda pública sin iniciar sesión
+- detectar ubicación con GPS del navegador
+- mostrar el mapa como vista principal
+- buscar productos
+- ver precios, stock y tiendas cercanas
+- agregar varios productos de un mismo local a una sola reserva
+- seleccionar fecha y hora de recojo
+- iniciar sesión solo si desea confirmar la reserva
+- ver perfil
+- ver historial de reservas
+- cancelar reservas
+
+Funciones como vendedor:
+- registrarse como vendedor
+- registrar su negocio y tienda
+- iniciar sesión
+- entrar a dashboard
+- configurar negocio
+- crear, editar y eliminar productos
+- subir imágenes de productos
+- gestionar stock
+- ver reservas del local
+- aprobar reservas
+- marcar reservas como listas
+- completar entrega
+- cancelar reservas con motivo
+- enviar mensaje al cliente
+- ver nombre, correo y teléfono del cliente que realizó la reserva
+
+Comportamiento especial del login:
+- no deben existir páginas feas separadas de login para cliente y vendedor
+- el inicio de sesión debe ser único
+- el sistema debe detectar automáticamente si la cuenta es cliente o vendedor
+- el registro debe tener una sola pantalla elegante con dos opciones:
+  - Cliente
+  - Vendedor
+
+Tecnología sugerida:
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Supabase
+- Leaflet o React Leaflet para el mapa
+
+Hosting sugerido:
+- Vercel para la web
+
+-----------------------------------
+C. APP DE ESCRITORIO
+-----------------------------------
+
+La aplicación de escritorio estará dirigida a los dueños de negocio o vendedores.
+
+Objetivo:
+Facilitar la gestión del negocio desde una interfaz enfocada en productividad.
+
+Funciones principales:
+- iniciar sesión con cuenta de vendedor
+- no registrarse desde escritorio, sino desde la web
+- una vez registrado el negocio en web, poder entrar desde escritorio
+- gestionar productos con CRUD
+- administrar inventario
+- actualizar precio
+- actualizar stock
+- revisar reservas
+- aprobar, cancelar o preparar pedidos
+- ver productos reservados
+- ver información del cliente
+- controlar mejor el flujo de atención en tienda
+
+Restricciones:
+- el escritorio será solo para vendedores
+- no será para clientes
+- debe conectarse a la misma base de datos y backend en la nube
+
+==================================================
+4. ROLES DEL SISTEMA
+==================================================
+
+El sistema manejará como mínimo estos roles:
+
+1. Cliente
+2. Vendedor
+3. Administrador (opcional o futuro)
+
+-----------------------------------
+Cliente
+-----------------------------------
+Puede:
+- registrarse
+- iniciar sesión
+- buscar productos
+- ver mapa y tiendas cercanas
+- reservar productos
+- cancelar reservas
+- ver historial de reservas
+- editar perfil
+- registrar teléfono
+- indicar fecha y hora de recojo
+
+No puede:
+- crear tienda
+- crear productos
+- ver dashboard de vendedor
+- gestionar reservas de otras personas
+
+-----------------------------------
+Vendedor
+-----------------------------------
+Puede:
+- registrarse
+- crear negocio
+- crear tienda
+- iniciar sesión
+- gestionar productos
+- gestionar stock
+- ver reservas del local
+- aprobar reservas
+- marcar pedidos como listos
+- completar entrega
+- cancelar reservas con motivo
+- enviar mensajes al cliente
+- ver nombre, correo y teléfono del cliente asociado a la reserva
+
+No puede:
+- reservar como vendedor
+- usar módulos exclusivos de cliente para confirmar pedidos
+
+-----------------------------------
+Administrador
+-----------------------------------
+Si se implementa, podrá:
+- supervisar usuarios
+- supervisar negocios
+- moderar contenido
+- aprobar o revisar tiendas
+- controlar información general del sistema
+
+==================================================
+5. FLUJO GENERAL DEL CLIENTE
+==================================================
+
+1. El cliente abre la app móvil o la web
+2. Se obtiene su ubicación mediante GPS
+3. Busca un producto
+4. El sistema consulta la base de datos
+5. Se muestran productos cercanos disponibles con:
+   - precio
+   - stock
+   - tienda
+   - imagen
+   - distancia
+   - mapa
+6. El cliente puede agregar uno o varios productos del mismo local
+7. El cliente indica fecha y hora de recojo
+8. Si no ha iniciado sesión, el sistema le pide login solo al confirmar reserva
+9. La reserva se guarda
+10. El cliente puede verla en su historial
+11. El cliente puede cancelarla si aún está pendiente o confirmada
+
+==================================================
+6. FLUJO GENERAL DEL VENDEDOR
+==================================================
+
+1. El vendedor se registra desde la web
+2. El sistema crea su cuenta con rol vendedor
+3. Registra negocio y tienda
+4. Coloca nombre, dirección, distrito, ciudad, país, latitud y longitud
+5. Luego puede entrar al dashboard
+6. Crea productos con:
+   - nombre
+   - descripción
+   - marca
+   - categoría
+   - precio
+   - stock
+   - imagen
+   - disponibilidad
+7. Cuando un cliente hace una reserva:
+   - el vendedor la visualiza
+   - revisa productos, cantidades y hora de recojo
+   - puede aprobarla
+   - puede marcarla como lista
+   - puede completarla
+   - puede cancelarla con motivo
+8. El cliente visualiza en su historial los cambios de estado y mensajes del vendedor
+
+==================================================
+7. RESERVAS
+==================================================
+
+La reserva debe funcionar así:
+
+- una reserva pertenece a un solo local
+- una reserva puede contener varios productos del mismo local
+- el cliente puede agregar más de un producto a la misma reserva
+- la reserva debe guardar:
+  - cliente
+  - local
+  - productos
+  - cantidades
+  - subtotal por ítem
+  - total
+  - estado
+  - fecha y hora de recojo
+  - nota opcional del cliente
+  - mensaje del vendedor
+  - motivo de cancelación
+  - código de recojo
+
+Estados de reserva sugeridos:
+- pending
+- confirmed
+- ready
+- completed
+- cancelled
+
+==================================================
+8. BASE DE DATOS
+==================================================
+
+Debe existir una base de datos centralizada en la nube compartida por las 3 plataformas.
+
+Tecnología sugerida:
+- Supabase
+- PostgreSQL
+
+Tablas principales sugeridas:
+- profiles
+- businesses
+- stores
+- categories
+- products
+- store_products
+- reservations
+- reservation_items
+
+Consideraciones:
+- autenticación por roles
+- políticas RLS según rol
+- almacenamiento de imágenes de productos en bucket
+- consultas de geolocalización
+- funciones SQL o RPC para búsquedas cercanas y reservas
+
+==================================================
+9. AUTENTICACIÓN
+==================================================
+
+Debe usarse autenticación por correo y contraseña.
+
+Requisitos:
+- registro por correo
+- inicio de sesión
+- verificación de correo
+- rol asignado en profile
+- login único
+- detección automática del rol
+- protección de rutas según rol
+
+Cliente:
+- puede entrar a perfil y reservas
+
+Vendedor:
+- puede entrar a dashboard, productos, setup y reservas del local
+
+==================================================
+10. GEOLOCALIZACIÓN Y MAPA
+==================================================
+
+El sistema debe usar GPS para ubicar al usuario y mostrar negocios cercanos.
+
+Requisitos:
+- obtener latitud y longitud del usuario
+- guardar latitud y longitud de tiendas
+- mostrar mapa interactivo
+- calcular distancia entre usuario y tienda
+- permitir buscar productos dentro de cierto radio
+- ordenar resultados por cercanía
+
+==================================================
+11. UI / UX
+==================================================
+
+La experiencia visual debe ser moderna, limpia y elegante.
+
+Lineamientos:
+- diseño claro, no oscuro por defecto
+- color principal púrpura #7900f3
+- color secundario azul petróleo #00647a
+- fondos suaves y claros
+- cards blancas o grises muy claros
+- evitar bordes duros
+- usar espacios amplios
+- formularios limpios
+- navegación simple
+- la página principal de la web debe mostrar directamente el mapa y la búsqueda
+- en la esquina debe existir el acceso a iniciar sesión / registrarse
+- debe existir un botón o logo tipo “AhorraPe” para volver al inicio
+
+==================================================
+12. TECNOLOGÍAS SUGERIDAS
+==================================================
+
+Backend:
+- Supabase
+- PostgreSQL
+- Supabase Auth
+- Supabase Storage
+
+Web:
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Leaflet / React Leaflet
+
+Móvil:
+- Kotlin
+- Jetpack Compose
+
+Escritorio:
+- aplicación conectada al mismo backend en la nube
+- enfocada en vendedores
+
+Hosting:
+- Vercel para la web
+- Supabase para base de datos, auth y storage
+- SMTP externo para confirmación de correos en producción
+
+==================================================
+13. DESPLIEGUE
+==================================================
+
+El proyecto no debe quedar solo en local.
+
+Requisitos:
+- la web debe estar hosteada y accesible desde internet
+- la base de datos debe estar en la nube
+- el sistema debe poder ser probado por el docente
+- la app móvil puede probarse mediante APK
+- la app de escritorio puede probarse mediante ejecutable conectado al backend
+
+Arquitectura final recomendada:
+- Vercel + Supabase + Storage + Auth + SMTP externo
+
+==================================================
+14. REQUERIMIENTOS CLAVE DEL NEGOCIO
+==================================================
+
+- permitir que el usuario ahorre tiempo y dinero
+- brindar visibilidad digital a negocios locales
+- facilitar la búsqueda de productos cercanos
+- permitir reservas antes de acercarse al local
+- permitir al vendedor gestionar mejor su inventario y sus pedidos
+- trabajar con una sola base de datos para todas las plataformas
+- permitir expansión futura a más ciudades
+
+==================================================
+15. OBJETIVO GENERAL DEL SISTEMA
+==================================================
+
+Desarrollar una solución tecnológica integral compuesta por aplicación móvil, plataforma web y aplicación de escritorio, que permita buscar productos cercanos mediante GPS, visualizar tiendas en un mapa, consultar precios y stock en tiempo real, y realizar reservas, mientras los vendedores gestionan su negocio, sus productos y las reservas desde un sistema conectado a una base de datos centralizada en la nube.
+
+==================================================
+16. INSTRUCCIÓN FINAL
+==================================================
+
+Con toda esta información, quiero que estructures, desarrolles, documentes o mejores el sistema respetando esta arquitectura, estas plataformas, estos roles, esta lógica de negocio y esta visión general del proyecto. No quiero una solución local aislada, sino una solución conectada, escalable, clara, coherente y lista para pruebas reales.
+
+Te envio el pront con la idea de este proyecto, tambien te envio los archivos y todo lo progrmado hasta el momento para la web

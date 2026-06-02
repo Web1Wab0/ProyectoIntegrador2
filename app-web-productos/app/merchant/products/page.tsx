@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
+import Notice from "../../../components/notice";
 
 type Category = {
   id: string;
@@ -28,8 +29,25 @@ type StoreProductRow = {
   product: ProductInfo | null;
 };
 
+type MaybeArray<T> = T | T[] | null;
+type RawStoreProductRow = Omit<StoreProductRow, "product"> & {
+  product: MaybeArray<ProductInfo>;
+};
+
+function firstOrNull<T>(value: MaybeArray<T> | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function normalizeStoreProductRow(row: RawStoreProductRow): StoreProductRow {
+  return {
+    ...row,
+    product: firstOrNull(row.product),
+  };
+}
+
 export default function MerchantProductsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -54,14 +72,38 @@ export default function MerchantProductsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
+  const loadStoreProducts = useCallback(
+    async (currentStoreId: string) => {
+      const { data, error } = await supabase
+        .from("store_products")
+        .select(`
+          id,
+          price,
+          stock,
+          image_url,
+          is_available,
+          product:products!store_products_product_id_fkey (
+            id,
+            product_name,
+            description,
+            brand,
+            category_id
+          )
+        `)
+        .eq("store_id", currentStoreId)
+        .order("created_at", { ascending: false });
 
-  async function loadInitialData() {
-    setLoading(true);
-    setMessage("");
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
 
+      setProducts((data ?? []).map(normalizeStoreProductRow));
+    },
+    [supabase]
+  );
+
+  const loadInitialData = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -125,39 +167,17 @@ export default function MerchantProductsPage() {
     }
 
     setCategories(categoriesData ?? []);
-
     await loadStoreProducts(storeData.id);
-
     setLoading(false);
-  }
+  }, [loadStoreProducts, router, supabase]);
 
-  async function loadStoreProducts(currentStoreId: string) {
-    const { data, error } = await supabase
-  .from("store_products")
-  .select(`
-    id,
-    price,
-    stock,
-    image_url,
-    is_available,
-    product:products!store_products_product_id_fkey (
-      id,
-      product_name,
-      description,
-      brand,
-      category_id
-    )
-  `)
-  .eq("store_id", currentStoreId)
-  .order("created_at", { ascending: false });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadInitialData();
+    }, 0);
 
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setProducts((data as StoreProductRow[]) ?? []);
-  }
+    return () => window.clearTimeout(timer);
+  }, [loadInitialData]);
 
   function resetForm() {
     setEditingStoreProductId(null);
@@ -258,16 +278,17 @@ export default function MerchantProductsPage() {
 
         setMessage("Producto actualizado correctamente.");
       } else {
-        const { data: createdProduct, error: productInsertError } = await supabase
-          .from("products")
-          .insert({
-            product_name: productName,
-            description: description || null,
-            brand: brand || null,
-            category_id: categoryId || null,
-          })
-          .select("id")
-          .single();
+        const { data: createdProduct, error: productInsertError } =
+          await supabase
+            .from("products")
+            .insert({
+              product_name: productName,
+              description: description || null,
+              brand: brand || null,
+              category_id: categoryId || null,
+            })
+            .select("id")
+            .single();
 
         if (productInsertError) {
           setMessage(productInsertError.message);
@@ -320,7 +341,9 @@ export default function MerchantProductsPage() {
   }
 
   async function handleDelete(storeProductId: string) {
-    const confirmed = window.confirm("¿Seguro que deseas eliminar este producto de tu tienda?");
+    const confirmed = window.confirm(
+      "¿Seguro que deseas eliminar este producto de tu tienda?"
+    );
     if (!confirmed) return;
 
     const { error } = await supabase
@@ -339,72 +362,84 @@ export default function MerchantProductsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando productos...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-6xl grid gap-6 lg:grid-cols-[420px_1fr]">
-        <section className="rounded-2xl bg-gray-900 p-6 shadow-lg h-fit">
+    <main className="app-page">
+      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[420px_1fr]">
+        <section className="app-card h-fit p-6 shadow-lg">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold">
+              <h1 className="page-title text-2xl">
                 {editingStoreProductId ? "Editar producto" : "Nuevo producto"}
               </h1>
-              <p className="mt-1 text-sm text-gray-400">
+              <p className="mt-1 text-sm text-muted">
                 Agrega productos, precios, stock e imagen.
               </p>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="rounded-lg bg-gray-800 px-3 py-2 text-sm hover:bg-gray-700"
-            >
+            <Link href="/dashboard" className="btn-soft px-4 py-2 text-sm">
               Volver
             </Link>
           </div>
 
+          {message && (
+            <div className="mb-4">
+              <Notice
+                type={
+                  message.toLowerCase().includes("correctamente")
+                    ? "success"
+                    : message.toLowerCase().includes("eliminado")
+                    ? "warning"
+                    : "error"
+                }
+                message={message}
+              />
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm">Nombre del producto</label>
+              <label className="mb-2 block small-label">Nombre del producto</label>
               <input
                 type="text"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 required
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm">Descripción</label>
+              <label className="mb-2 block small-label">Descripción</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                rows={4}
+                className="app-input"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm">Marca</label>
+              <label className="mb-2 block small-label">Marca</label>
               <input
                 type="text"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm">Categoría</label>
+              <label className="mb-2 block small-label">Categoría</label>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                className="app-input"
               >
                 <option value="">Sin categoría</option>
                 {categories.map((category) => (
@@ -415,9 +450,9 @@ export default function MerchantProductsPage() {
               </select>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm">Precio</label>
+                <label className="mb-2 block small-label">Precio</label>
                 <input
                   type="number"
                   step="0.01"
@@ -425,51 +460,38 @@ export default function MerchantProductsPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm">Stock</label>
+                <label className="mb-2 block small-label">Stock</label>
                 <input
                   type="number"
                   min="0"
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                  className="app-input"
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm">Imagen del producto</label>
+              <label className="mb-2 block small-label">Imagen</label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
-
-            {currentImageUrl && (
-              <div className="rounded-xl bg-gray-800 p-3">
-                <p className="mb-2 text-sm text-gray-300">Imagen actual</p>
-                <Image
-                  src={currentImageUrl}
-                  alt="Producto"
-                  width={160}
-                  height={160}
-                  className="rounded-lg object-cover"
-                />
-              </div>
-            )}
 
             <div className="flex gap-3">
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 rounded-lg bg-green-600 px-4 py-3 font-semibold hover:bg-green-700 disabled:opacity-60"
+                className="btn-primary flex-1 disabled:opacity-60"
               >
                 {saving
                   ? "Guardando..."
@@ -479,80 +501,65 @@ export default function MerchantProductsPage() {
               </button>
 
               {editingStoreProductId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="rounded-lg bg-gray-700 px-4 py-3 font-semibold hover:bg-gray-600"
-                >
+                <button type="button" onClick={resetForm} className="btn-soft">
                   Cancelar
                 </button>
               )}
             </div>
           </form>
-
-          {message && (
-            <p className="mt-4 rounded-lg bg-gray-800 p-4 text-sm text-gray-200">
-              {message}
-            </p>
-          )}
         </section>
 
-        <section className="rounded-2xl bg-gray-900 p-6 shadow-lg">
-          <h2 className="mb-6 text-2xl font-bold">Productos de la tienda</h2>
+        <section className="app-card p-6 shadow-lg">
+          <h2 className="section-title text-2xl">Productos registrados</h2>
 
           {products.length === 0 ? (
-            <div className="rounded-xl bg-gray-800 p-5 text-gray-300">
-              Todavía no has agregado productos.
+            <div className="info-box mt-4">
+              Aún no tienes productos registrados.
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               {products.map((item) => (
-                <article
-                  key={item.id}
-                  className="rounded-xl bg-gray-800 p-4"
-                >
+                <article key={item.id} className="app-card-soft p-5">
                   {item.image_url ? (
                     <Image
                       src={item.image_url}
                       alt={item.product?.product_name ?? "Producto"}
                       width={400}
                       height={220}
-                      className="mb-4 h-48 w-full rounded-lg object-cover"
+                      className="mb-4 h-44 w-full rounded-2xl object-cover"
                     />
                   ) : (
-                    <div className="mb-4 flex h-48 w-full items-center justify-center rounded-lg bg-gray-700 text-gray-300">
+                    <div className="mb-4 flex h-44 items-center justify-center rounded-2xl bg-[#eef2f7] text-sm text-muted">
                       Sin imagen
                     </div>
                   )}
 
-                  <h3 className="text-xl font-semibold">
-                    {item.product?.product_name}
+                  <h3 className="section-title text-xl">
+                    {item.product?.product_name ?? "Producto"}
                   </h3>
 
-                  <p className="mt-2 text-sm text-gray-300">
+                  <p className="mt-2 text-sm leading-7 text-muted">
                     {item.product?.description || "Sin descripción"}
                   </p>
 
-                  <div className="mt-3 space-y-1 text-sm text-gray-300">
+                  <div className="mt-3 space-y-1 text-sm text-muted">
                     <p>Marca: {item.product?.brand || "Sin marca"}</p>
                     <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
                     <p>Stock: {item.stock}</p>
-                    <p>
-                      Estado: {item.is_available ? "Disponible" : "No disponible"}
-                    </p>
+                    <p>Estado: {item.is_available ? "Disponible" : "No disponible"}</p>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-5 flex gap-3">
                     <button
                       onClick={() => handleEdit(item)}
-                      className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-semibold hover:bg-blue-700"
+                      className="btn-secondary"
                     >
                       Editar
                     </button>
 
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-semibold hover:bg-red-700"
+                      className="btn-danger"
                     >
                       Eliminar
                     </button>

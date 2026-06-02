@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #7900f3;
+  --primary-soft: #b68aff;
+  --secondary: #00647a;
+  --tertiary: #a400a4;
+
+  --surface: #f5f6f7;
+  --surface-low: #eff1f2;
+  --surface-lowest: #ffffff;
+  --surface-high: #f2f4f7;
+
+  --on-surface: #2c2f30;
+  --muted: #5f6b76;
+  --muted-soft: #7b8794;
+
+  --danger: #dc2626;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface);
+  color: var(--on-surface);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .app-page {
+    @apply min-h-screen px-6 py-10;
+    background: var(--surface);
+    color: var(--on-surface);
+  }
+
+  .app-card {
+    background: var(--surface-lowest);
+    border-radius: 1.5rem;
+    box-shadow: 0 10px 30px rgba(44, 47, 48, 0.06);
+  }
+
+  .app-card-soft {
+    background: #f8f9fb;
+    border-radius: 1.5rem;
+  }
+
+  .app-input {
+    @apply w-full rounded-2xl px-4 py-3 outline-none;
+    background: #eef2f7;
+    color: var(--on-surface);
+    border: 1px solid transparent;
+  }
+
+  .app-input::placeholder {
+    color: #8b95a1;
+  }
+
+  .app-input:focus {
+    background: #ffffff;
+    border-color: rgba(121, 0, 243, 0.18);
+    box-shadow: 0 0 0 3px rgba(121, 0, 243, 0.06);
+  }
+
+  .btn-primary {
+    @apply rounded-2xl px-4 py-3 font-semibold text-white transition;
+    background: linear-gradient(135deg, var(--primary), var(--primary-soft));
+  }
+
+  .btn-primary:hover {
+    filter: brightness(0.98);
+  }
+
+  .btn-secondary {
+    @apply rounded-2xl px-4 py-3 font-semibold text-white transition;
+    background: var(--secondary);
+  }
+
+  .btn-secondary:hover {
+    filter: brightness(0.98);
+  }
+
+  .btn-soft {
+    @apply rounded-2xl px-4 py-3 font-semibold transition;
+    background: #eef1f4;
+    color: var(--on-surface);
+  }
+
+  .btn-soft:hover {
+    background: #e7ebef;
+  }
+
+  .btn-danger {
+    @apply rounded-2xl px-4 py-3 font-semibold text-white transition;
+    background: var(--danger);
+  }
+
+  .page-title {
+    color: var(--on-surface);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .section-title {
+    color: var(--on-surface);
+    font-weight: 600;
+  }
+
+  .text-muted {
+    color: var(--muted);
+  }
+
+  .text-soft {
+    color: var(--muted-soft);
+  }
+
+  .info-box {
+    @apply rounded-2xl px-4 py-4 text-sm;
+    background: #eef1f4;
+    color: var(--muted);
+  }
+
+  .success-box {
+    @apply rounded-2xl px-4 py-4 text-sm;
+    background: rgba(0, 100, 122, 0.08);
+    color: #0f5a6b;
+  }
+
+  .card-option {
+    @apply rounded-3xl p-5 text-left transition;
+    background: #ffffff;
+  }
+
+  .card-option-active {
+    background: rgba(121, 0, 243, 0.05);
+    box-shadow: inset 0 0 0 1px rgba(121, 0, 243, 0.22);
+  }
+
+  .small-label {
+    color: var(--on-surface);
+    font-weight: 500;
+  }
+
+  .link-primary {
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  .link-primary:hover {
+    text-decoration: underline;
+  }
+
+  .chip-selected {
+    @apply rounded-full px-3 py-1 text-xs font-semibold text-white;
+    background: linear-gradient(135deg, var(--primary), var(--primary-soft));
+  }
 }

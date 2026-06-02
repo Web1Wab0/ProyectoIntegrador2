@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
+import { signOutCurrentSession } from "../../lib/auth/sign-out";
 import Notice from "../../components/notice";
 
 type ProfileInfo = {
@@ -13,9 +15,11 @@ type ProfileInfo = {
 
 export default function ProfilePage() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
   const [notice, setNotice] = useState<{
@@ -118,68 +122,71 @@ export default function ProfilePage() {
   }
 
   async function handleSignOut() {
+    if (signingOut) return;
+
+    setSigningOut(true);
+
     try {
-      await supabase.auth.signOut();
+      await signOutCurrentSession(supabase);
+    } catch (error) {
+      console.error("No se pudo cerrar sesion.", error);
     } finally {
-      window.location.replace("/");
+      router.replace("/");
+      router.refresh();
     }
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <main className="app-page flex items-center justify-center">
         Cargando perfil...
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-3xl rounded-2xl bg-gray-900 p-8 shadow-lg">
-        <h1 className="mb-2 text-3xl font-bold">Mi perfil</h1>
-        <p className="mb-8 text-gray-400">
+    <main className="app-page">
+      <div className="mx-auto max-w-3xl app-card p-8 shadow-lg">
+        <h1 className="page-title text-3xl">Mi perfil</h1>
+        <p className="mt-2 text-base text-muted">
           Aquí puedes ver y actualizar los datos de tu cuenta.
         </p>
 
-        {notice && <Notice type={notice.type} message={notice.message} />}
+        {notice && <div className="mt-6"><Notice type={notice.type} message={notice.message} /></div>}
 
-        <form onSubmit={handleSaveProfile} className="mt-6 space-y-4">
-          <div className="rounded-2xl bg-gray-800 p-6 space-y-4">
+        <form onSubmit={handleSaveProfile} className="mt-6 space-y-5">
+          <div className="app-card-soft space-y-5 p-6">
             <div>
-              <p className="mb-2 text-sm text-gray-400">Correo</p>
-              <div className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-white">
+              <p className="mb-2 small-label">Correo</p>
+              <div className="rounded-2xl bg-[#eef2f7] px-4 py-3 text-[var(--on-surface)]">
                 {email || "Sin correo"}
               </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">
-                Nombre completo
-              </label>
+              <label className="mb-2 block small-label">Nombre completo</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">
-                Teléfono
-              </label>
+              <label className="mb-2 block small-label">Teléfono</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Ejemplo: 987654321"
-                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 outline-none"
+                className="app-input"
               />
             </div>
 
             <div>
-              <p className="mb-2 text-sm text-gray-400">Tipo de cuenta</p>
-              <div className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-white">
+              <p className="mb-2 small-label">Tipo de cuenta</p>
+              <div className="rounded-2xl bg-[#eef2f7] px-4 py-3 text-[var(--on-surface)]">
                 {profile.role === "customer"
                   ? "Cliente"
                   : profile.role === "merchant"
@@ -192,43 +199,35 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-700 disabled:opacity-60"
+            className="btn-primary w-full disabled:opacity-60"
           >
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
         </form>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/"
-            className="rounded-lg bg-gray-800 px-4 py-3 font-semibold hover:bg-gray-700"
-          >
+          <Link href="/" className="btn-soft">
             Ir al inicio
           </Link>
 
           {profile.role === "customer" && (
-            <Link
-              href="/customer/reservations"
-              className="rounded-lg bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-700"
-            >
+            <Link href="/customer/reservations" className="btn-primary">
               Ver mis reservas
             </Link>
           )}
 
           {profile.role === "merchant" && (
-            <Link
-              href="/dashboard"
-              className="rounded-lg bg-green-600 px-4 py-3 font-semibold hover:bg-green-700"
-            >
+            <Link href="/dashboard" className="btn-secondary">
               Ir al dashboard
             </Link>
           )}
 
           <button
             onClick={handleSignOut}
-            className="rounded-lg bg-red-600 px-4 py-3 font-semibold hover:bg-red-700"
+            disabled={signingOut}
+            className="btn-danger disabled:opacity-60"
           >
-            Cerrar sesión
+            {signingOut ? "Cerrando..." : "Cerrar sesión"}
           </button>
         </div>
       </div>
