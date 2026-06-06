@@ -62,16 +62,16 @@ export default function DashboardPage() {
 
   return (
     <main className="app-page">
-      <div className="mx-auto max-w-4xl app-card p-8 shadow-lg">
-        <h1 className="page-title text-3xl">Dashboard del local</h1>
+      <div className="mx-auto max-w-4xl app-card p-5 shadow-lg sm:p-8">
+        <h1 className="page-title text-2xl sm:text-3xl">Dashboard del local</h1>
         <p className="mt-3 text-base text-muted">
-          Sesión iniciada con: <span className="font-semibold text-[var(--on-surface)]">{user?.email}</span>
+          Sesión iniciada con: <span className="break-words font-semibold text-[var(--on-surface)]">{user?.email}</span>
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <Link
             href="/merchant/setup"
-            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8]"
+            className="app-card-soft rounded-2xl p-4 transition hover:bg-[#f2f5f8] sm:p-6"
           >
             <h2 className="section-title text-xl">Configurar negocio</h2>
             <p className="mt-2 text-muted">
@@ -81,7 +81,7 @@ export default function DashboardPage() {
 
           <Link
             href="/merchant/products"
-            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8]"
+            className="app-card-soft rounded-2xl p-4 transition hover:bg-[#f2f5f8] sm:p-6"
           >
             <h2 className="section-title text-xl">Productos</h2>
             <p className="mt-2 text-muted">
@@ -91,7 +91,7 @@ export default function DashboardPage() {
 
           <Link
             href="/merchant/reservations"
-            className="app-card-soft rounded-2xl p-6 transition hover:bg-[#f2f5f8] md:col-span-2"
+            className="app-card-soft rounded-2xl p-4 transition hover:bg-[#f2f5f8] sm:p-6 md:col-span-2"
           >
             <h2 className="section-title text-xl">Reservas</h2>
             <p className="mt-2 text-muted">

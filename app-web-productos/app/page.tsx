@@ -1034,14 +1034,14 @@ export default function SearchPage() {
   );
 
   return (
-    <main className="app-page px-6 py-10">
+    <main className="app-page">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="mb-4 flex justify-end">
           <AuthAccessMenu />
         </div>
 
-        <div className="rounded-2xl app-card p-6 shadow-lg">
-          <h1 className="page-title text-4xl">
+        <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
+          <h1 className="page-title text-3xl sm:text-4xl">
             Buscar productos cercanos
           </h1>
           <p className="mt-3 text-base text-muted">
@@ -1063,7 +1063,7 @@ export default function SearchPage() {
             </button>
 
             {userLat !== null && userLng !== null && (
-              <div className="rounded-2xl app-card-soft px-4 py-3 text-sm text-muted">
+              <div className="max-w-full break-words rounded-2xl app-card-soft px-4 py-3 text-sm text-muted">
                 Lat: {userLat.toFixed(6)} | Lng: {userLng.toFixed(6)}
               </div>
             )}
@@ -1114,7 +1114,7 @@ export default function SearchPage() {
         </div>
 
         {userLat !== null && userLng !== null && (
-          <div className="rounded-2xl app-card p-4 shadow-lg">
+          <div className="rounded-2xl app-card p-3 shadow-lg sm:p-4">
             <SearchMap
               userLat={userLat}
               userLng={userLng}
@@ -1127,7 +1127,7 @@ export default function SearchPage() {
         )}
 
         {userLat !== null && userLng !== null && (
-          <section className="rounded-2xl app-card p-6 shadow-lg">
+          <section className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="section-title text-2xl">Tiendas cercanas</h2>
@@ -1161,16 +1161,16 @@ export default function SearchPage() {
                     }`}
                     onClick={() => handleSelectStore(store)}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+                      <div className="min-w-0">
                         <h3 className="section-title text-xl">
                           {store.store_name}
                         </h3>
-                        <p className="mt-1 text-sm text-muted">
+                        <p className="mt-1 break-words text-sm text-muted">
                           {store.address_text}
                         </p>
                       </div>
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                         {formatDistance(store.distance_meters)}
                       </span>
                     </div>
@@ -1200,7 +1200,7 @@ export default function SearchPage() {
         )}
 
         {cartStoreId && (
-          <div className="rounded-2xl app-card p-6 shadow-lg">
+          <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
             <h2 className="text-2xl font-bold">Mi reserva</h2>
             <p className="mt-2 text-muted">
               Local seleccionado:{" "}
@@ -1223,14 +1223,14 @@ export default function SearchPage() {
                     className="rounded-xl app-card-soft p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="font-semibold">{item.product_name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-semibold">{item.product_name}</p>
                         <p className="text-sm text-muted">
                           S/ {Number(item.price).toFixed(2)} c/u
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
                           type="number"
                           min="1"
@@ -1242,7 +1242,7 @@ export default function SearchPage() {
                               Number(e.target.value)
                             )
                           }
-                          className="w-24 rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none"
+                          className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
                         />
 
                         <button
@@ -1347,8 +1347,8 @@ export default function SearchPage() {
         )}
 
         {cartStoreId && (
-          <div className="rounded-2xl app-card p-6 shadow-lg">
-            <h2 className="text-2xl font-bold">
+          <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
+            <h2 className="break-words text-2xl font-bold">
               Productos de {cartStoreName || selectedNearbyStore?.store_name}
             </h2>
             <p className="mt-2 text-muted">
@@ -1434,7 +1434,7 @@ export default function SearchPage() {
                         <p>Stock: {item.stock}</p>
                       </div>
 
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <input
                           type="number"
                           min="1"
@@ -1446,7 +1446,7 @@ export default function SearchPage() {
                               [item.id]: Number(e.target.value),
                             }))
                           }
-                          className="w-24 rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none"
+                          className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
                         />
 
                         <button
@@ -1511,7 +1511,7 @@ export default function SearchPage() {
                 <p>Horario: {formatOpeningHours(item.opening_hours)}</p>
               </div>
 
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <input
                   type="number"
                   min="1"
@@ -1523,7 +1523,7 @@ export default function SearchPage() {
                       [item.store_product_id]: Number(e.target.value),
                     }))
                   }
-                  className="w-24 rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none"
+                  className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
                 />
 
                 <button

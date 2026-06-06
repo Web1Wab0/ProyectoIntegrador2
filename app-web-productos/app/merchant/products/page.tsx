@@ -420,9 +420,9 @@ export default function MerchantProductsPage() {
   return (
     <main className="app-page">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[420px_1fr]">
-        <section className="app-card h-fit p-6 shadow-lg">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div>
+        <section className="app-card h-fit p-4 shadow-lg sm:p-6">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h1 className="page-title text-2xl">
                 {editingStoreProductId ? "Editar producto" : "Nuevo producto"}
               </h1>
@@ -536,7 +536,7 @@ export default function MerchantProductsPage() {
               />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
@@ -558,8 +558,8 @@ export default function MerchantProductsPage() {
           </form>
         </section>
 
-        <section className="app-card p-6 shadow-lg">
-          <h2 className="section-title text-2xl">Productos registrados</h2>
+        <section className="app-card p-4 shadow-lg sm:p-6">
+          <h2 className="section-title text-xl sm:text-2xl">Productos registrados</h2>
 
           {products.length === 0 ? (
             <div className="info-box mt-4">
@@ -568,7 +568,7 @@ export default function MerchantProductsPage() {
           ) : (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {products.map((item) => (
-                <article key={item.id} className="app-card-soft p-5">
+                <article key={item.id} className="app-card-soft p-4 sm:p-5">
                   {item.image_url ? (
                     <div className="mb-4 flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#eef2f7]">
                       <Image
@@ -585,22 +585,22 @@ export default function MerchantProductsPage() {
                     </div>
                   )}
 
-                  <h3 className="section-title text-xl">
+                  <h3 className="section-title break-words text-xl">
                     {item.product?.product_name ?? "Producto"}
                   </h3>
 
-                  <p className="mt-2 text-sm leading-7 text-muted">
+                  <p className="mt-2 break-words text-sm leading-7 text-muted">
                     {item.product?.description || "Sin descripción"}
                   </p>
 
-                  <div className="mt-3 space-y-1 text-sm text-muted">
+                  <div className="mt-3 space-y-1 break-words text-sm text-muted">
                     <p>Marca: {item.product?.brand || "Sin marca"}</p>
                     <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
                     <p>Stock: {item.stock}</p>
                     <p>Estado: {item.is_available ? "Disponible" : "No disponible"}</p>
                   </div>
 
-                  <div className="mt-5 flex gap-3">
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => handleEdit(item)}
                       className="btn-secondary"

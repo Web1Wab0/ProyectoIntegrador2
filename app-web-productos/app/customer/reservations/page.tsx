@@ -278,9 +278,9 @@ export default function CustomerReservationsPage() {
   return (
     <main className="app-page">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="page-title text-3xl">Mis reservas</h1>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="page-title text-2xl sm:text-3xl">Mis reservas</h1>
             <p className="mt-2 text-base text-muted">
               Aquí puedes ver el historial de tus reservas, revisar estados y cancelar las que sigan pendientes.
             </p>
@@ -294,24 +294,24 @@ export default function CustomerReservationsPage() {
         {notice && <Notice type={notice.type} message={notice.message} />}
 
         {reservations.length === 0 ? (
-          <div className="app-card mt-4 p-6 shadow-lg">
+          <div className="app-card mt-4 p-4 shadow-lg sm:p-6">
             No tienes reservas todavía.
           </div>
         ) : (
           <div className="mt-4 space-y-4">
             {reservations.map((item) => (
-              <article key={item.id} className="app-card p-6 shadow-lg">
+              <article key={item.id} className="app-card p-4 shadow-lg sm:p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="section-title text-xl">
                       {item.stores?.store_name || "Tienda"}
                     </h2>
-                    <p className="mt-1 text-sm text-muted">
+                    <p className="mt-1 break-words text-sm text-muted">
                       {item.stores?.address_text || "Sin dirección"}
                     </p>
                   </div>
 
-                  <div className="app-card-soft rounded-2xl px-4 py-3 text-sm">
+                  <div className="app-card-soft w-full rounded-2xl px-4 py-3 text-sm sm:w-auto">
                     <p>
                       Estado:{" "}
                       <span
@@ -330,7 +330,7 @@ export default function CustomerReservationsPage() {
                         {item.status}
                       </span>
                     </p>
-                    <p className="mt-1 text-[var(--on-surface)]">Código: {item.pickup_code}</p>
+                    <p className="mt-1 break-words text-[var(--on-surface)]">Código: {item.pickup_code}</p>
                   </div>
                 </div>
 
@@ -350,7 +350,7 @@ export default function CustomerReservationsPage() {
                 {item.notes && (
                   <div className="app-card-soft mt-4 rounded-2xl p-4">
                     <p className="text-sm text-muted">Nota del cliente</p>
-                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.notes}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--on-surface)]">{item.notes}</p>
                   </div>
                 )}
 
@@ -360,7 +360,7 @@ export default function CustomerReservationsPage() {
                     {item.reservation_items.map((detail) => (
                       <div key={detail.id} className="app-card-soft rounded-2xl p-4">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                          <div>
+                          <div className="min-w-0">
                             <p className="font-semibold text-[var(--on-surface)]">
                               {detail.store_products?.products?.product_name || "Producto"}
                             </p>
@@ -383,14 +383,14 @@ export default function CustomerReservationsPage() {
                 {item.merchant_message && (
                   <div className="app-card-soft mt-4 rounded-2xl p-4">
                     <p className="text-sm text-muted">Mensaje del vendedor</p>
-                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.merchant_message}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--on-surface)]">{item.merchant_message}</p>
                   </div>
                 )}
 
                 {item.customer_cancel_reason && (
                   <div className="app-card-soft mt-4 rounded-2xl p-4">
                     <p className="text-sm text-muted">Motivo de cancelación</p>
-                    <p className="mt-1 text-sm text-[var(--on-surface)]">{item.customer_cancel_reason}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--on-surface)]">{item.customer_cancel_reason}</p>
                   </div>
                 )}
 
@@ -412,8 +412,8 @@ export default function CustomerReservationsPage() {
       </div>
 
       {cancelModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4">
-          <div className="app-card w-full max-w-md p-6 shadow-xl">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="app-card w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto p-5 shadow-xl sm:p-6">
             <h2 className="section-title text-2xl">Cancelar reserva</h2>
             <p className="mt-2 text-sm text-muted">
               Puedes escribir un motivo opcional antes de cancelar.
@@ -430,7 +430,7 @@ export default function CustomerReservationsPage() {
               />
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={() => {

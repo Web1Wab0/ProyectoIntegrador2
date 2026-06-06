@@ -146,8 +146,8 @@ export default function ProfilePage() {
 
   return (
     <main className="app-page">
-      <div className="mx-auto max-w-3xl app-card p-8 shadow-lg">
-        <h1 className="page-title text-3xl">Mi perfil</h1>
+      <div className="mx-auto max-w-3xl app-card p-5 shadow-lg sm:p-8">
+        <h1 className="page-title text-2xl sm:text-3xl">Mi perfil</h1>
         <p className="mt-2 text-base text-muted">
           Aquí puedes ver y actualizar los datos de tu cuenta.
         </p>
@@ -155,10 +155,10 @@ export default function ProfilePage() {
         {notice && <div className="mt-6"><Notice type={notice.type} message={notice.message} /></div>}
 
         <form onSubmit={handleSaveProfile} className="mt-6 space-y-5">
-          <div className="app-card-soft space-y-5 p-6">
+          <div className="app-card-soft space-y-5 p-4 sm:p-6">
             <div>
               <p className="mb-2 small-label">Correo</p>
-              <div className="rounded-2xl bg-[#eef2f7] px-4 py-3 text-[var(--on-surface)]">
+              <div className="break-words rounded-2xl bg-[#eef2f7] px-4 py-3 text-[var(--on-surface)]">
                 {email || "Sin correo"}
               </div>
             </div>

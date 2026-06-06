@@ -91,10 +91,10 @@ function SignInForm() {
   }
 
   return (
-    <main className="app-page flex items-center justify-center px-6">
-      <div className="w-full max-w-md app-card p-8 shadow-lg">
+    <main className="app-page flex items-center justify-center">
+      <div className="w-full max-w-md app-card p-5 shadow-lg sm:p-8">
         <div className="mb-6">
-          <h1 className="page-title text-3xl">Iniciar sesión</h1>
+          <h1 className="page-title text-2xl sm:text-3xl">Iniciar sesión</h1>
           <p className="mt-2 text-base text-muted">
             Ingresa con tu correo y contraseña.
           </p>
@@ -151,7 +151,7 @@ export default function SignInPage() {
   return (
     <Suspense
       fallback={
-        <main className="app-page flex items-center justify-center px-6">
+        <main className="app-page flex items-center justify-center">
           Cargando inicio de sesion...
         </main>
       }

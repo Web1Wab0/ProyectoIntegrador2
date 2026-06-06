@@ -65,7 +65,7 @@ export default function SearchMap({
   onSelectStore,
 }: Props) {
   return (
-    <div className="h-[420px] w-full overflow-hidden rounded-2xl">
+    <div className="h-[320px] w-full overflow-hidden rounded-2xl sm:h-[420px]">
       <MapContainer
         center={[userLat, userLng]}
         zoom={15}

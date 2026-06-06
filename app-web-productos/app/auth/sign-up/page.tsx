@@ -48,18 +48,18 @@ export default function SignUpPage() {
   }
 
   return (
-    <main className="app-page px-6 py-10">
+    <main className="app-page">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 text-center">
-          <h1 className="page-title text-4xl text-center">Crear cuenta</h1>
+          <h1 className="page-title text-center text-3xl sm:text-4xl">Crear cuenta</h1>
           <p className="mt-3 text-center text-base text-muted">
             Elige cómo usarás la plataforma y completa tus datos.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="app-card p-6 shadow-lg">
-            <h2 className="section-title text-2xl">
+          <section className="app-card p-4 shadow-lg sm:p-6">
+            <h2 className="section-title text-xl sm:text-2xl">
               Selecciona tu tipo de cuenta
             </h2>
 
@@ -71,7 +71,7 @@ export default function SignUpPage() {
                   role === "customer" ? "card-option-active" : ""
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="mb-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="section-title text-xl">Cliente</span>
 
                   {role === "customer" && (
@@ -98,7 +98,7 @@ export default function SignUpPage() {
                   role === "merchant" ? "card-option-active" : ""
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="mb-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="section-title text-xl">Vendedor</span>
 
                   {role === "merchant" && (
@@ -120,9 +120,9 @@ export default function SignUpPage() {
             </div>
           </section>
 
-          <section className="app-card p-6 shadow-lg">
+          <section className="app-card p-4 shadow-lg sm:p-6">
             <div className="mb-6">
-              <h2 className="section-title text-2xl">
+              <h2 className="section-title text-xl sm:text-2xl">
                 {role === "customer"
                   ? "Registro de cliente"
                   : "Registro de vendedor"}

@@ -203,7 +203,7 @@ export default function StoreLocationPicker({
         </div>
       )}
 
-      <div className="h-[360px] w-full overflow-hidden rounded-2xl">
+      <div className="h-[300px] w-full overflow-hidden rounded-2xl sm:h-[360px]">
         <MapContainer
           center={center}
           zoom={16}

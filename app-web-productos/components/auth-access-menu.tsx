@@ -134,10 +134,10 @@ export default function AuthAccessMenu() {
   const isLoggedIn = !!account.email;
 
   return (
-    <div className="relative">
+    <div className="relative max-w-full">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-2xl px-5 py-3 font-semibold text-white shadow-sm transition hover:brightness-95"
+        className="rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 sm:px-5 sm:text-base"
         style={{
           background: "linear-gradient(135deg, #7900f3, #b68aff)",
         }}
@@ -147,7 +147,7 @@ export default function AuthAccessMenu() {
 
       {open && (
         <div
-          className="absolute right-0 z-[9999] mt-3 w-72 rounded-3xl p-2 shadow-xl"
+          className="absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-3xl p-2 shadow-xl sm:w-72"
           style={{
             background: "#ffffff",
             color: "#2c2f30",

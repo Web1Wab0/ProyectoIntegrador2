@@ -387,10 +387,10 @@ export default function MerchantSetupPage() {
 
   return (
     <main className="app-page">
-      <div className="mx-auto max-w-3xl app-card p-8 shadow-lg">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <div>
-            <h1 className="page-title text-3xl">Configuración del local</h1>
+      <div className="mx-auto max-w-3xl app-card p-5 shadow-lg sm:p-8">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="page-title text-2xl sm:text-3xl">Configuración del local</h1>
             <p className="mt-2 text-muted">
               Registra tu negocio y la ubicación de tu tienda.
             </p>
@@ -416,8 +416,8 @@ export default function MerchantSetupPage() {
           </div>
         )}
 
-        <form onSubmit={handleSave} className="space-y-8">
-          <section className="app-card-soft p-5">
+        <form onSubmit={handleSave} className="space-y-6 sm:space-y-8">
+          <section className="app-card-soft p-4 sm:p-5">
             <h2 className="section-title mb-4 text-xl">Datos del negocio</h2>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -454,7 +454,7 @@ export default function MerchantSetupPage() {
             </div>
           </section>
 
-          <section className="app-card-soft p-5">
+          <section className="app-card-soft p-4 sm:p-5">
             <h2 className="section-title mb-4 text-xl">Datos de la tienda</h2>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -556,7 +556,7 @@ export default function MerchantSetupPage() {
             </div>
           </section>
 
-          <section className="app-card-soft p-5">
+          <section className="app-card-soft p-4 sm:p-5">
             <h2 className="section-title mb-4 text-xl">
               Horario de atencion
             </h2>
@@ -568,7 +568,7 @@ export default function MerchantSetupPage() {
                 return (
                   <div
                     key={day.key}
-                    className="grid gap-3 rounded-2xl bg-white/60 p-4 md:grid-cols-[120px_120px_1fr_1fr]"
+                    className="grid gap-3 rounded-2xl bg-white/60 p-3 sm:p-4 md:grid-cols-[120px_120px_1fr_1fr]"
                   >
                     <div className="font-semibold text-[var(--on-surface)]">
                       {day.label}
