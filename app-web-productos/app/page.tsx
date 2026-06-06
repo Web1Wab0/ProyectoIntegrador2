@@ -1402,13 +1402,15 @@ export default function SearchPage() {
                       className="rounded-xl app-card-soft p-4"
                     >
                       {item.image_url ? (
-                        <Image
-                          src={item.image_url}
-                          alt={item.product?.product_name ?? "Producto"}
-                          width={400}
-                          height={220}
-                          className="mb-4 h-40 w-full rounded-lg object-cover"
-                        />
+                        <div className="mb-4 flex h-40 w-full items-center justify-center overflow-hidden rounded-lg bg-[#eef2f7]">
+                          <Image
+                            src={item.image_url}
+                            alt={item.product?.product_name ?? "Producto"}
+                            width={400}
+                            height={220}
+                            className="h-full w-full object-contain p-2"
+                          />
+                        </div>
                       ) : (
                         <div className="mb-4 flex h-40 items-center justify-center rounded-lg bg-gray-700 text-gray-300">
                           Sin imagen
@@ -1479,13 +1481,15 @@ export default function SearchPage() {
               className="rounded-2xl app-card p-5 shadow-lg"
             >
               {item.image_url ? (
-                <Image
-                  src={item.image_url}
-                  alt={item.product_name}
-                  width={400}
-                  height={220}
-                  className="mb-4 h-48 w-full rounded-lg object-cover"
-                />
+                <div className="mb-4 flex h-48 w-full items-center justify-center overflow-hidden rounded-lg bg-[#eef2f7]">
+                  <Image
+                    src={item.image_url}
+                    alt={item.product_name}
+                    width={400}
+                    height={220}
+                    className="h-full w-full object-contain p-2"
+                  />
+                </div>
               ) : (
                 <div className="mb-4 flex h-48 items-center justify-center rounded-lg app-card-soft text-gray-300">
                   Sin imagen

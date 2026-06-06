@@ -5,6 +5,28 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 
+function getSafeInternalPath(nextUrl: string | null) {
+  if (!nextUrl || !nextUrl.startsWith("/") || nextUrl.startsWith("//")) {
+    return "/";
+  }
+
+  if (nextUrl.includes("\\")) {
+    return "/";
+  }
+
+  try {
+    const parsedUrl = new URL(nextUrl, window.location.origin);
+
+    if (parsedUrl.origin !== window.location.origin) {
+      return "/";
+    }
+
+    return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch {
+    return "/";
+  }
+}
+
 function SignInForm() {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -58,7 +80,7 @@ function SignInForm() {
     }
 
     if (profile.role === "customer") {
-      const nextUrl = searchParams.get("next") || "/";
+      const nextUrl = getSafeInternalPath(searchParams.get("next"));
       window.location.replace(nextUrl);
       return;
     }

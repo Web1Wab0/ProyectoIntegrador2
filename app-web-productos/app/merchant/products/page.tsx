@@ -34,6 +34,13 @@ type RawStoreProductRow = Omit<StoreProductRow, "product"> & {
   product: MaybeArray<ProductInfo>;
 };
 
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PRODUCT_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 function firstOrNull<T>(value: MaybeArray<T> | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
@@ -44,6 +51,18 @@ function normalizeStoreProductRow(row: RawStoreProductRow): StoreProductRow {
     ...row,
     product: firstOrNull(row.product),
   };
+}
+
+function validateProductImage(file: File) {
+  if (!ALLOWED_PRODUCT_IMAGE_EXTENSIONS[file.type]) {
+    return "La imagen debe ser JPG, PNG o WebP.";
+  }
+
+  if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+    return "La imagen no debe superar los 5 MB.";
+  }
+
+  return null;
 }
 
 export default function MerchantProductsPage() {
@@ -192,16 +211,46 @@ export default function MerchantProductsPage() {
     setCurrentImageUrl("");
   }
 
+  function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0] ?? null;
+
+    if (!selectedFile) {
+      setImageFile(null);
+      return;
+    }
+
+    const imageError = validateProductImage(selectedFile);
+
+    if (imageError) {
+      setImageFile(null);
+      setMessage(imageError);
+      e.target.value = "";
+      return;
+    }
+
+    setImageFile(selectedFile);
+    setMessage("");
+  }
+
   async function uploadImageIfNeeded() {
     if (!imageFile) return currentImageUrl || null;
 
-    const fileExt = imageFile.name.split(".").pop();
+    const imageError = validateProductImage(imageFile);
+
+    if (imageError) {
+      throw new Error(imageError);
+    }
+
+    const fileExt = ALLOWED_PRODUCT_IMAGE_EXTENSIONS[imageFile.type];
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
     const filePath = `${userId}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("product-images")
-      .upload(filePath, imageFile, { upsert: false });
+      .upload(filePath, imageFile, {
+        upsert: false,
+        contentType: imageFile.type,
+      });
 
     if (uploadError) {
       throw new Error(uploadError.message);
@@ -481,8 +530,8 @@ export default function MerchantProductsPage() {
               <label className="mb-2 block small-label">Imagen</label>
               <input
                 type="file"
-                accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleImageFileChange}
                 className="app-input"
               />
             </div>
@@ -521,13 +570,15 @@ export default function MerchantProductsPage() {
               {products.map((item) => (
                 <article key={item.id} className="app-card-soft p-5">
                   {item.image_url ? (
-                    <Image
-                      src={item.image_url}
-                      alt={item.product?.product_name ?? "Producto"}
-                      width={400}
-                      height={220}
-                      className="mb-4 h-44 w-full rounded-2xl object-cover"
-                    />
+                    <div className="mb-4 flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#eef2f7]">
+                      <Image
+                        src={item.image_url}
+                        alt={item.product?.product_name ?? "Producto"}
+                        width={400}
+                        height={220}
+                        className="h-full w-full object-contain p-2"
+                      />
+                    </div>
                   ) : (
                     <div className="mb-4 flex h-44 items-center justify-center rounded-2xl bg-[#eef2f7] text-sm text-muted">
                       Sin imagen

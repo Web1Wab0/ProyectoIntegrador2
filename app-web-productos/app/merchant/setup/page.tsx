@@ -157,6 +157,8 @@ export default function MerchantSetupPage() {
             "id, store_name, address_text, district, city, country, latitude, longitude, opening_hours"
           )
           .eq("business_id", businessData.id)
+          .order("updated_at", { ascending: false })
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle<StoreRow>();
 
@@ -167,6 +169,8 @@ export default function MerchantSetupPage() {
                 "id, store_name, address_text, district, city, country, latitude, longitude"
               )
               .eq("business_id", businessData.id)
+              .order("updated_at", { ascending: false })
+              .order("created_at", { ascending: false })
               .limit(1)
               .maybeSingle<StoreRow>()
           : storeWithHours;
@@ -301,40 +305,65 @@ export default function MerchantSetupPage() {
       }
     }
 
-    if (!storeId) {
-      const { error: storeInsertError } = await supabase.from("stores").insert({
-        business_id: currentBusinessId,
-        store_name: storeName,
-        address_text: addressText,
-        district: district || null,
-        city: city || "Ica",
-        country: country || "Perú",
-        latitude: lat,
-        longitude: lng,
-        opening_hours: openingHours,
-        status: "pending",
-        is_active: true,
-      });
+    const storePayload = {
+      store_name: storeName,
+      address_text: addressText,
+      district: district || null,
+      city: city || "Ica",
+      country: country || "Per\u00fa",
+      latitude: lat,
+      longitude: lng,
+      opening_hours: openingHours,
+    };
+
+    let currentStoreId = storeId;
+
+    if (!currentStoreId) {
+      const { data: existingStore, error: existingStoreError } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("business_id", currentBusinessId)
+        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+
+      if (existingStoreError) {
+        setMessage(existingStoreError.message);
+        setSaving(false);
+        return;
+      }
+
+      if (existingStore) {
+        currentStoreId = existingStore.id;
+        setStoreId(existingStore.id);
+      }
+    }
+
+    if (!currentStoreId) {
+      const { data: createdStore, error: storeInsertError } = await supabase
+        .from("stores")
+        .insert({
+          business_id: currentBusinessId,
+          ...storePayload,
+          status: "pending",
+          is_active: true,
+        })
+        .select("id")
+        .single();
 
       if (storeInsertError) {
         setMessage(storeInsertError.message);
         setSaving(false);
         return;
       }
+
+      setStoreId(createdStore.id);
     } else {
       const { error: storeUpdateError } = await supabase
         .from("stores")
-        .update({
-          store_name: storeName,
-          address_text: addressText,
-          district: district || null,
-          city: city || "Ica",
-          country: country || "Perú",
-          latitude: lat,
-          longitude: lng,
-          opening_hours: openingHours,
-        })
-        .eq("id", storeId);
+        .update(storePayload)
+        .eq("id", currentStoreId);
 
       if (storeUpdateError) {
         setMessage(storeUpdateError.message);
@@ -493,7 +522,7 @@ export default function MerchantSetupPage() {
 
               <div className="md:col-span-2">
                 <label className="mb-2 block small-label">
-                  Buscar o seleccionar ubicaciÃ³n en el mapa
+                  Buscar o seleccionar ubicación en el mapa
                 </label>
                 <StoreLocationPicker
                   latitude={hasValidMapCoordinates ? mapLatitude : null}

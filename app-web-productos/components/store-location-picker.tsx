@@ -102,9 +102,7 @@ export default function StoreLocationPicker({
     return DEFAULT_CENTER;
   }, [latitude, longitude]);
 
-  async function handleSearchAddress(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
+  async function handleSearchAddress() {
     const searchText = query.trim();
     if (!searchText) {
       setMessage("Escribe una direccion o calle para buscar.");
@@ -163,26 +161,30 @@ export default function StoreLocationPicker({
 
   return (
     <div className="space-y-4">
-      <form
-        onSubmit={handleSearchAddress}
-        className="grid gap-3 md:grid-cols-[1fr_160px]"
-      >
+      <div className="grid gap-3 md:grid-cols-[1fr_160px]">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void handleSearchAddress();
+            }
+          }}
           placeholder="Busca una calle, avenida o referencia"
           className="app-input"
         />
 
         <button
-          type="submit"
+          type="button"
+          onClick={() => void handleSearchAddress()}
           disabled={searching}
           className="btn-secondary disabled:opacity-60"
         >
           {searching ? "Buscando..." : "Buscar calle"}
         </button>
-      </form>
+      </div>
 
       {message && <div className="info-box text-sm">{message}</div>}
 

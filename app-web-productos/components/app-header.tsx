@@ -17,7 +17,7 @@ export default function AppHeader() {
               AhorraPe
             </p>
             <p className="text-xs text-[var(--muted)]">
-              Busca, compara y reserva
+              Busca, compra y reserva
             </p>
           </div>
         </Link>
