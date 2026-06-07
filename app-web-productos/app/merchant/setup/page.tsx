@@ -11,6 +11,12 @@ import {
   type StoreOpeningHours,
   validateOpeningHours,
 } from "../../../lib/store-hours";
+import {
+  buildFullName,
+  readProfileWithFallback,
+  splitFullName,
+  updateProfileWithFallback,
+} from "../../../lib/auth/profile";
 import Notice from "../../../components/notice";
 
 const StoreLocationPicker = dynamic(
@@ -39,6 +45,7 @@ type StoreRow = {
   country: string | null;
   latitude: number;
   longitude: number;
+  description?: string | null;
   opening_hours?: unknown;
 };
 
@@ -48,6 +55,16 @@ type AddressSelection = {
   city?: string;
   country?: string;
 };
+
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+
+  return (
+    error.code === "42703" ||
+    error.message?.toLowerCase().includes("column") ||
+    error.message?.toLowerCase().includes("schema cache")
+  );
+}
 
 export default function MerchantSetupPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -60,11 +77,13 @@ export default function MerchantSetupPage() {
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
 
-  const [businessName, setBusinessName] = useState("");
+  const [ownerFirstName, setOwnerFirstName] = useState("");
+  const [ownerLastName, setOwnerLastName] = useState("");
+  const [ownerPhone, setOwnerPhone] = useState("");
   const [ruc, setRuc] = useState("");
-  const [description, setDescription] = useState("");
 
   const [storeName, setStoreName] = useState("");
+  const [storeDescription, setStoreDescription] = useState("");
   const [addressText, setAddressText] = useState("");
   const [district, setDistrict] = useState("");
   const [city, setCity] = useState("Ica");
@@ -132,6 +151,22 @@ export default function MerchantSetupPage() {
         return;
       }
 
+      try {
+        const profile = await readProfileWithFallback(supabase, user.id);
+        setOwnerFirstName(profile.firstName);
+        setOwnerLastName(profile.lastName);
+        setOwnerPhone(profile.phone);
+      } catch {
+        const splitName = splitFullName(user.user_metadata?.full_name);
+        setOwnerFirstName(splitName.firstName);
+        setOwnerLastName(splitName.lastName);
+        setOwnerPhone(
+          typeof user.user_metadata?.phone === "string"
+            ? user.user_metadata.phone
+            : ""
+        );
+      }
+
       const { data: businessData, error: businessError } = await supabase
         .from("businesses")
         .select("id, business_name, ruc, description")
@@ -147,14 +182,17 @@ export default function MerchantSetupPage() {
 
       if (businessData) {
         setBusinessId(businessData.id);
-        setBusinessName(businessData.business_name ?? "");
         setRuc(businessData.ruc ?? "");
-        setDescription(businessData.description ?? "");
+        setStoreDescription(businessData.description ?? "");
+
+        const splitBusinessName = splitFullName(businessData.business_name);
+        setOwnerFirstName((prev) => prev || splitBusinessName.firstName);
+        setOwnerLastName((prev) => prev || splitBusinessName.lastName);
 
         const storeWithHours = await supabase
           .from("stores")
           .select(
-            "id, store_name, address_text, district, city, country, latitude, longitude, opening_hours"
+            "id, store_name, description, address_text, district, city, country, latitude, longitude, opening_hours"
           )
           .eq("business_id", businessData.id)
           .order("updated_at", { ascending: false })
@@ -184,6 +222,9 @@ export default function MerchantSetupPage() {
         if (storeData) {
           setStoreId(storeData.id);
           setStoreName(storeData.store_name ?? "");
+          setStoreDescription(
+            storeData.description ?? businessData.description ?? ""
+          );
           setAddressText(storeData.address_text ?? "");
           setDistrict(storeData.district ?? "");
           setCity(storeData.city ?? "Ica");
@@ -194,6 +235,10 @@ export default function MerchantSetupPage() {
             Number(storeData.longitude ?? 0)
           );
         }
+      } else {
+        const splitMetadataName = splitFullName(user.user_metadata?.full_name);
+        setOwnerFirstName((prev) => prev || splitMetadataName.firstName);
+        setOwnerLastName((prev) => prev || splitMetadataName.lastName);
       }
 
       setLoading(false);
@@ -265,6 +310,48 @@ export default function MerchantSetupPage() {
       return;
     }
 
+    const trimmedOwnerFirstName = ownerFirstName.trim();
+    const trimmedOwnerLastName = ownerLastName.trim();
+    const trimmedOwnerPhone = ownerPhone.trim();
+    const ownerFullName = buildFullName(
+      trimmedOwnerFirstName,
+      trimmedOwnerLastName
+    );
+
+    if (!trimmedOwnerFirstName || !trimmedOwnerLastName || !trimmedOwnerPhone) {
+      setMessage("Completa nombre, apellidos y telefono del propietario.");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          first_name: trimmedOwnerFirstName,
+          last_name: trimmedOwnerLastName,
+          full_name: ownerFullName,
+          phone: trimmedOwnerPhone,
+          role: "merchant",
+        },
+      });
+
+      await updateProfileWithFallback(supabase, {
+        userId: user.id,
+        firstName: trimmedOwnerFirstName,
+        lastName: trimmedOwnerLastName,
+        phone: trimmedOwnerPhone,
+        role: "merchant",
+      });
+    } catch (profileError) {
+      setMessage(
+        profileError instanceof Error
+          ? profileError.message
+          : "No se pudo actualizar el propietario."
+      );
+      setSaving(false);
+      return;
+    }
+
     let currentBusinessId = businessId;
 
     if (!currentBusinessId) {
@@ -273,9 +360,9 @@ export default function MerchantSetupPage() {
           .from("businesses")
           .insert({
             owner_user_id: user.id,
-            business_name: businessName,
+            business_name: ownerFullName,
             ruc: ruc || null,
-            description: description || null,
+            description: storeDescription || null,
           })
           .select("id")
           .single();
@@ -292,9 +379,9 @@ export default function MerchantSetupPage() {
       const { error: businessUpdateError } = await supabase
         .from("businesses")
         .update({
-          business_name: businessName,
+          business_name: ownerFullName,
           ruc: ruc || null,
-          description: description || null,
+          description: storeDescription || null,
         })
         .eq("id", currentBusinessId);
 
@@ -305,7 +392,7 @@ export default function MerchantSetupPage() {
       }
     }
 
-    const storePayload = {
+    const storePayloadBase = {
       store_name: storeName,
       address_text: addressText,
       district: district || null,
@@ -314,6 +401,10 @@ export default function MerchantSetupPage() {
       latitude: lat,
       longitude: lng,
       opening_hours: openingHours,
+    };
+    const storePayload = {
+      ...storePayloadBase,
+      description: storeDescription || null,
     };
 
     let currentStoreId = storeId;
@@ -341,7 +432,7 @@ export default function MerchantSetupPage() {
     }
 
     if (!currentStoreId) {
-      const { data: createdStore, error: storeInsertError } = await supabase
+      let { data: createdStore, error: storeInsertError } = await supabase
         .from("stores")
         .insert({
           business_id: currentBusinessId,
@@ -352,18 +443,49 @@ export default function MerchantSetupPage() {
         .select("id")
         .single();
 
+      if (storeInsertError && isMissingColumnError(storeInsertError)) {
+        const fallbackInsert = await supabase
+          .from("stores")
+          .insert({
+            business_id: currentBusinessId,
+            ...storePayloadBase,
+            status: "pending",
+            is_active: true,
+          })
+          .select("id")
+          .single();
+
+        createdStore = fallbackInsert.data;
+        storeInsertError = fallbackInsert.error;
+      }
+
       if (storeInsertError) {
         setMessage(storeInsertError.message);
         setSaving(false);
         return;
       }
 
+      if (!createdStore) {
+        setMessage("No se pudo confirmar la tienda creada.");
+        setSaving(false);
+        return;
+      }
+
       setStoreId(createdStore.id);
     } else {
-      const { error: storeUpdateError } = await supabase
+      let { error: storeUpdateError } = await supabase
         .from("stores")
         .update(storePayload)
         .eq("id", currentStoreId);
+
+      if (storeUpdateError && isMissingColumnError(storeUpdateError)) {
+        const fallbackUpdate = await supabase
+          .from("stores")
+          .update(storePayloadBase)
+          .eq("id", currentStoreId);
+
+        storeUpdateError = fallbackUpdate.error;
+      }
 
       if (storeUpdateError) {
         setMessage(storeUpdateError.message);
@@ -372,7 +494,7 @@ export default function MerchantSetupPage() {
       }
     }
 
-    setMessage("Negocio y tienda guardados correctamente.");
+    setMessage("Propietario y tienda guardados correctamente.");
     setSaving(false);
     router.refresh();
   }
@@ -418,15 +540,26 @@ export default function MerchantSetupPage() {
 
         <form onSubmit={handleSave} className="space-y-6 sm:space-y-8">
           <section className="app-card-soft p-4 sm:p-5">
-            <h2 className="section-title mb-4 text-xl">Datos del negocio</h2>
+            <h2 className="section-title mb-4 text-xl">Datos del propietario</h2>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="mb-2 block small-label">Nombre del negocio</label>
+              <div>
+                <label className="mb-2 block small-label">Nombre del dueño</label>
                 <input
                   type="text"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
+                  value={ownerFirstName}
+                  onChange={(e) => setOwnerFirstName(e.target.value)}
+                  required
+                  className="app-input"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block small-label">Apellidos</label>
+                <input
+                  type="text"
+                  value={ownerLastName}
+                  onChange={(e) => setOwnerLastName(e.target.value)}
                   required
                   className="app-input"
                 />
@@ -442,13 +575,16 @@ export default function MerchantSetupPage() {
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="mb-2 block small-label">Descripción</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
+              <div>
+                <label className="mb-2 block small-label">Telefono</label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={ownerPhone}
+                  onChange={(e) => setOwnerPhone(e.target.value)}
+                  required
                   className="app-input"
+                  placeholder="Ejemplo: 987654321"
                 />
               </div>
             </div>
@@ -465,6 +601,16 @@ export default function MerchantSetupPage() {
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
                   required
+                  className="app-input"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-2 block small-label">Descripcion</label>
+                <textarea
+                  value={storeDescription}
+                  onChange={(e) => setStoreDescription(e.target.value)}
+                  rows={4}
                   className="app-input"
                 />
               </div>

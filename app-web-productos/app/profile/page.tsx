@@ -3,14 +3,22 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "../../lib/supabase/client";
-import { signOutCurrentSession } from "../../lib/auth/sign-out";
 import Notice from "../../components/notice";
+import { signOutCurrentSession } from "../../lib/auth/sign-out";
+import {
+  buildFullName,
+  readProfileWithFallback,
+  updateProfileWithFallback,
+  type UserRole,
+} from "../../lib/auth/profile";
+import { createClient } from "../../lib/supabase/client";
 
 type ProfileInfo = {
-  full_name: string | null;
-  role: "customer" | "merchant" | "admin" | null;
-  phone: string | null;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  role: UserRole | null;
+  phone: string;
 };
 
 export default function ProfilePage() {
@@ -28,12 +36,15 @@ export default function ProfilePage() {
   } | null>(null);
 
   const [profile, setProfile] = useState<ProfileInfo>({
-    full_name: null,
+    firstName: "",
+    lastName: "",
+    fullName: "",
     role: null,
-    phone: null,
+    phone: "",
   });
 
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
 
   useEffect(() => {
@@ -56,23 +67,24 @@ export default function ProfilePage() {
         setUserId(user.id);
         setEmail(user.email ?? "");
 
-        const { data } = await supabase
-          .from("profiles")
-          .select("full_name, role, phone")
-          .eq("id", user.id)
-          .maybeSingle();
+        const nextProfile = await readProfileWithFallback(supabase, user.id);
 
         if (!mounted) return;
 
-        const nextProfile = {
-          full_name: data?.full_name ?? null,
-          role: (data?.role as ProfileInfo["role"]) ?? null,
-          phone: data?.phone ?? null,
-        };
-
         setProfile(nextProfile);
-        setFullName(nextProfile.full_name ?? "");
-        setPhone(nextProfile.phone ?? "");
+        setFirstName(nextProfile.firstName);
+        setLastName(nextProfile.lastName);
+        setPhone(nextProfile.phone);
+      } catch (error) {
+        if (!mounted) return;
+
+        setNotice({
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No se pudo cargar el perfil.",
+        });
       } finally {
         if (mounted) setLoading(false);
       }
@@ -93,32 +105,53 @@ export default function ProfilePage() {
     setSaving(true);
     setNotice(null);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: fullName.trim() || null,
-        phone: phone.trim() || null,
-      })
-      .eq("id", userId);
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedPhone = phone.trim();
 
-    if (error) {
-      setNotice({ type: "error", message: error.message });
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          first_name: trimmedFirstName,
+          last_name: trimmedLastName,
+          full_name: buildFullName(trimmedFirstName, trimmedLastName),
+          phone: trimmedPhone,
+          ...(profile.role ? { role: profile.role } : {}),
+        },
+      });
+
+      await updateProfileWithFallback(supabase, {
+        userId,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        phone: trimmedPhone,
+        role: profile.role,
+      });
+
+      const nextProfile = {
+        ...profile,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        fullName: buildFullName(trimmedFirstName, trimmedLastName),
+        phone: trimmedPhone,
+      };
+
+      setProfile(nextProfile);
+      setNotice({
+        type: "success",
+        message: "Perfil actualizado correctamente.",
+      });
+    } catch (error) {
+      setNotice({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo actualizar el perfil.",
+      });
+    } finally {
       setSaving(false);
-      return;
     }
-
-    setProfile((prev) => ({
-      ...prev,
-      full_name: fullName.trim() || null,
-      phone: phone.trim() || null,
-    }));
-
-    setNotice({
-      type: "success",
-      message: "Perfil actualizado correctamente.",
-    });
-
-    setSaving(false);
   }
 
   async function handleSignOut() {
@@ -149,10 +182,14 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-3xl app-card p-5 shadow-lg sm:p-8">
         <h1 className="page-title text-2xl sm:text-3xl">Mi perfil</h1>
         <p className="mt-2 text-base text-muted">
-          Aquí puedes ver y actualizar los datos de tu cuenta.
+          Aqui puedes ver y actualizar los datos de tu cuenta.
         </p>
 
-        {notice && <div className="mt-6"><Notice type={notice.type} message={notice.message} /></div>}
+        {notice && (
+          <div className="mt-6">
+            <Notice type={notice.type} message={notice.message} />
+          </div>
+        )}
 
         <form onSubmit={handleSaveProfile} className="mt-6 space-y-5">
           <div className="app-card-soft space-y-5 p-4 sm:p-6">
@@ -163,20 +200,33 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div>
-              <label className="mb-2 block small-label">Nombre completo</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="app-input"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block small-label">Nombre</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="app-input"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block small-label">Apellidos</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="app-input"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="mb-2 block small-label">Teléfono</label>
+              <label className="mb-2 block small-label">Telefono</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Ejemplo: 987654321"
@@ -227,7 +277,7 @@ export default function ProfilePage() {
             disabled={signingOut}
             className="btn-danger disabled:opacity-60"
           >
-            {signingOut ? "Cerrando..." : "Cerrar sesión"}
+            {signingOut ? "Cerrando..." : "Cerrar sesion"}
           </button>
         </div>
       </div>

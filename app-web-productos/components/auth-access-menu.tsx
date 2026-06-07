@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/client";
 import { signOutCurrentSession } from "../lib/auth/sign-out";
+import { getUserMetadataProfile, readProfileWithFallback } from "../lib/auth/profile";
 
 type RoleType = "customer" | "merchant" | "admin" | null;
 
@@ -38,10 +39,12 @@ export default function AuthAccessMenu() {
       return;
     }
 
+    const metadataProfile = getUserMetadataProfile(user);
+
     setAccount({
       email: user.email ?? null,
-      fullName: user.user_metadata?.full_name ?? "Usuario",
-      role: (user.user_metadata?.role as RoleType) ?? null,
+      fullName: metadataProfile.fullName || "Usuario",
+      role: metadataProfile.role,
     });
   }, []);
 
@@ -51,21 +54,23 @@ export default function AuthAccessMenu() {
       profileRequestIdRef.current = requestId;
 
       window.setTimeout(async () => {
-        const { data } = await supabase
-          .from("profiles")
-          .select("full_name, role")
-          .eq("id", userId)
-          .maybeSingle();
+        let profile: Awaited<ReturnType<typeof readProfileWithFallback>>;
 
-        if (!data || profileRequestIdRef.current !== requestId) return;
+        try {
+          profile = await readProfileWithFallback(supabase, userId);
+        } catch {
+          return;
+        }
+
+        if (profileRequestIdRef.current !== requestId) return;
 
         setAccount((prev) => {
           if (!prev.email) return prev;
 
           return {
             email: prev.email,
-            fullName: data.full_name ?? prev.fullName,
-            role: (data.role as RoleType) ?? prev.role,
+            fullName: profile.fullName || prev.fullName,
+            role: profile.role ?? prev.role,
           };
         });
       }, 0);
