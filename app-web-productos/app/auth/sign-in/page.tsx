@@ -10,15 +10,13 @@ import { readProfileWithFallback } from "../../../lib/auth/profile";
 import { getAuthRedirectUrl } from "../../../lib/auth/site-url";
 import { createClient } from "../../../lib/supabase/client";
 
-type OAuthProvider = Extract<Provider, "google" | "azure">;
+type OAuthProvider = Extract<Provider, "google">;
 
 const oauthProviders: Array<{
   provider: OAuthProvider;
   label: string;
-  scopes?: string;
 }> = [
   { provider: "google", label: "Continuar con Google" },
-  { provider: "azure", label: "Continuar con Microsoft", scopes: "email" },
 ];
 
 function SignInForm() {
@@ -81,7 +79,6 @@ function SignInForm() {
       provider: providerConfig.provider,
       options: {
         redirectTo,
-        ...(providerConfig.scopes ? { scopes: providerConfig.scopes } : {}),
       },
     });
 
