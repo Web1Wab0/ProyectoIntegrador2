@@ -20,10 +20,23 @@ const oauthProviders: Array<{
   { provider: "google", label: "Continuar con Google" },
 ];
 
+function getFriendlySignUpErrorMessage(message: string) {
+  if (message.toLowerCase().includes("database error saving new user")) {
+    return [
+      "No se pudo crear la cuenta porque falta aplicar la correccion de base de datos en Supabase.",
+      "Ejecuta app-web-productos/supabase/fix_auth_signup_profile_trigger.sql en Supabase SQL Editor y vuelve a intentarlo.",
+    ].join(" ");
+  }
+
+  return message;
+}
+
 function SignUpForm() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
-  const initialMessage = searchParams.get("auth_error") ?? "";
+  const initialMessage = getFriendlySignUpErrorMessage(
+    searchParams.get("auth_error") ?? ""
+  );
 
   const [role, setRole] = useState<RoleType>("customer");
   const [firstName, setFirstName] = useState("");
@@ -68,7 +81,7 @@ function SignUpForm() {
     });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(getFriendlySignUpErrorMessage(error.message));
       setLoading(false);
       return;
     }
@@ -95,7 +108,7 @@ function SignUpForm() {
     });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(getFriendlySignUpErrorMessage(error.message));
       setOauthLoading(null);
     }
   }
