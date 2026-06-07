@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     "";
   const nextPath = getSafeInternalPath(requestUrl.searchParams.get("next"));
   const requestedRole = normalizeRole(requestUrl.searchParams.get("role"));
+  const cameFromSignUp = requestedRole !== null;
   const errorTarget = getErrorTarget(requestedRole);
 
   if (providerError) {
@@ -81,10 +82,18 @@ export async function GET(request: Request) {
     );
   }
 
-  const profile = await ensureProfileForUser(supabase, user, requestedRole);
-  const targetPath = profile.role
+  const profile = await ensureProfileForUser(supabase, user, requestedRole, {
+    preferFallbackRole: cameFromSignUp,
+  });
+  const userMetadata = user.user_metadata ?? {};
+  const passwordAlreadySet = userMetadata.password_set === true;
+  const defaultTargetPath = profile.role
     ? getDefaultPathForRole(profile.role, nextPath)
     : `/auth/complete-profile?next=${encodeURIComponent(nextPath)}`;
+  const targetPath =
+    cameFromSignUp && profile.role && !passwordAlreadySet
+      ? `/auth/set-password?next=${encodeURIComponent(defaultTargetPath)}`
+      : defaultTargetPath;
   const response = NextResponse.redirect(new URL(targetPath, origin));
 
   cookiesToSet.forEach(({ name, value, options }) => {

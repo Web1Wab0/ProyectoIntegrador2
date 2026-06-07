@@ -223,9 +223,11 @@ export async function updateProfileWithFallback(
 export async function ensureProfileForUser(
   supabase: SupabaseClient,
   user: User,
-  fallbackRole?: UserRole | null
+  fallbackRole?: UserRole | null,
+  options?: { preferFallbackRole?: boolean }
 ) {
   const metadataProfile = getUserMetadataProfile(user);
+  const normalizedFallbackRole = normalizeRole(fallbackRole);
   let currentProfile: ProfileDetails | null = null;
 
   try {
@@ -234,16 +236,17 @@ export async function ensureProfileForUser(
     currentProfile = null;
   }
 
+  const nextRole =
+    options?.preferFallbackRole && normalizedFallbackRole
+      ? normalizedFallbackRole
+      : currentProfile?.role ?? metadataProfile.role ?? normalizedFallbackRole ?? null;
+
   const nextProfile: ProfileDetails = {
     firstName: currentProfile?.firstName || metadataProfile.firstName,
     lastName: currentProfile?.lastName || metadataProfile.lastName,
     fullName: currentProfile?.fullName || metadataProfile.fullName,
     phone: currentProfile?.phone || metadataProfile.phone,
-    role:
-      currentProfile?.role ??
-      metadataProfile.role ??
-      normalizeRole(fallbackRole) ??
-      null,
+    role: nextRole,
   };
 
   if (nextProfile.firstName || nextProfile.lastName || nextProfile.phone || nextProfile.role) {

@@ -90,10 +90,10 @@ function CompleteProfileForm() {
     const trimmedLastName = lastName.trim();
     const trimmedPhone = phone.trim();
 
-    if (!trimmedFirstName || !trimmedLastName || !trimmedPhone) {
+    if (!trimmedFirstName || !trimmedLastName) {
       setNotice({
         type: "warning",
-        message: "Completa nombre, apellidos y telefono.",
+        message: "Completa nombre y apellidos.",
       });
       setSaving(false);
       return;
@@ -201,13 +201,14 @@ function CompleteProfileForm() {
           </div>
 
           <div>
-            <label className="mb-2 block small-label">Numero de telefono</label>
+            <label className="mb-2 block small-label">
+              Numero de telefono (opcional)
+            </label>
             <input
               type="tel"
               inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              required
               className="app-input"
               placeholder="Ejemplo: 987654321"
             />
