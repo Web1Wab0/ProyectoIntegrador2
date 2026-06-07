@@ -2,7 +2,8 @@
 
 import type { Provider } from "@supabase/supabase-js";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PasswordField from "../../../components/password-field";
 import { getPasswordHelpMessage, isStrongPassword } from "../../../lib/auth/password";
 import { buildFullName } from "../../../lib/auth/profile";
@@ -19,8 +20,10 @@ const oauthProviders: Array<{
   { provider: "google", label: "Continuar con Google" },
 ];
 
-export default function SignUpPage() {
+function SignUpForm() {
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
+  const initialMessage = searchParams.get("auth_error") ?? "";
 
   const [role, setRole] = useState<RoleType>("customer");
   const [firstName, setFirstName] = useState("");
@@ -28,7 +31,7 @@ export default function SignUpPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
 
@@ -294,5 +297,19 @@ export default function SignUpPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="app-page flex items-center justify-center">
+          Cargando registro...
+        </main>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   );
 }

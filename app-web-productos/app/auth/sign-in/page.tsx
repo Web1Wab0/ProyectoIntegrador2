@@ -23,10 +23,11 @@ function SignInForm() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
   const nextUrl = getSafeInternalPath(searchParams.get("next"));
+  const initialMessage = searchParams.get("auth_error") ?? "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
 
