@@ -32,6 +32,16 @@ where table_schema = 'public'
   and column_default is null
   and column_name not in ('id');
 
+select
+  'profiles_role_type' as check_name,
+  data_type,
+  udt_schema,
+  udt_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'profiles'
+  and column_name = 'role';
+
 begin;
 
 -- 2) Make sure the profile table/columns expected by the app exist.
@@ -133,6 +143,7 @@ declare
   v_full_name text;
   v_phone text;
   v_role text;
+  v_role_cast text := '';
 begin
   v_full_name := nullif(
     btrim(
@@ -184,29 +195,50 @@ begin
     else 'customer'
   end;
 
-  insert into public.profiles (
-    id,
-    first_name,
-    last_name,
-    full_name,
-    phone,
-    role
+  select case
+    when c.data_type = 'USER-DEFINED'
+      then format('::%I.%I', c.udt_schema, c.udt_name)
+    else ''
+  end
+  into v_role_cast
+  from information_schema.columns c
+  where c.table_schema = 'public'
+    and c.table_name = 'profiles'
+    and c.column_name = 'role';
+
+  execute format(
+    'insert into public.profiles (
+      id,
+      first_name,
+      last_name,
+      full_name,
+      phone,
+      role
+    )
+    values (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6%s
+    )
+    on conflict (id) do update
+    set
+      first_name = coalesce(excluded.first_name, public.profiles.first_name),
+      last_name = coalesce(excluded.last_name, public.profiles.last_name),
+      full_name = coalesce(excluded.full_name, public.profiles.full_name),
+      phone = coalesce(excluded.phone, public.profiles.phone),
+      role = coalesce(excluded.role, public.profiles.role)',
+    coalesce(v_role_cast, '')
   )
-  values (
+  using
     new.id,
     v_first_name,
     v_last_name,
     v_full_name,
     v_phone,
-    v_role
-  )
-  on conflict (id) do update
-  set
-    first_name = coalesce(excluded.first_name, public.profiles.first_name),
-    last_name = coalesce(excluded.last_name, public.profiles.last_name),
-    full_name = coalesce(excluded.full_name, public.profiles.full_name),
-    phone = coalesce(excluded.phone, public.profiles.phone),
-    role = coalesce(excluded.role, public.profiles.role);
+    v_role;
 
   return new;
 exception
