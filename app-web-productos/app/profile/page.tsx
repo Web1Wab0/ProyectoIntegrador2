@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Notice from "../../components/notice";
+import PasswordField from "../../components/password-field";
+import {
+  getPasswordHelpMessage,
+  isStrongPassword,
+} from "../../lib/auth/password";
+import { hasPasswordSet } from "../../lib/auth/password-state";
 import { signOutCurrentSession } from "../../lib/auth/sign-out";
 import {
   buildFullName,
@@ -27,9 +33,11 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [email, setEmail] = useState("");
   const [userId, setUserId] = useState("");
+  const [canChangePassword, setCanChangePassword] = useState(false);
   const [notice, setNotice] = useState<{
     type: "success" | "warning" | "error";
     message: string;
@@ -46,6 +54,9 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -66,6 +77,7 @@ export default function ProfilePage() {
 
         setUserId(user.id);
         setEmail(user.email ?? "");
+        setCanChangePassword(hasPasswordSet(user));
 
         const nextProfile = await readProfileWithFallback(supabase, user.id);
 
@@ -151,6 +163,90 @@ export default function ProfilePage() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setNotice(null);
+
+    if (!email) {
+      setNotice({
+        type: "warning",
+        message: "No se pudo identificar el correo de la cuenta.",
+      });
+      return;
+    }
+
+    if (!currentPassword.trim()) {
+      setNotice({
+        type: "warning",
+        message: "Ingresa tu contrasena actual.",
+      });
+      return;
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      setNotice({ type: "warning", message: getPasswordHelpMessage(newPassword) });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setNotice({
+        type: "warning",
+        message: "Las contrasenas no coinciden.",
+      });
+      return;
+    }
+
+    setSavingPassword(true);
+
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        setNotice({
+          type: "warning",
+          message: "La contrasena actual no es correcta.",
+        });
+        return;
+      }
+
+      const { data: refreshedUser } = await supabase.auth.getUser();
+      const currentMetadata = refreshedUser.user?.user_metadata ?? {};
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: {
+          ...currentMetadata,
+          password_set: true,
+        },
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setCanChangePassword(true);
+      setNotice({
+        type: "success",
+        message: "Contrasena actualizada correctamente.",
+      });
+    } catch (error) {
+      setNotice({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo cambiar la contrasena.",
+      });
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -254,6 +350,64 @@ export default function ProfilePage() {
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
         </form>
+
+        <section className="mt-8 app-card-soft p-4 sm:p-6">
+          <h2 className="section-title text-xl sm:text-2xl">Seguridad</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Administra la contrasena usada para iniciar sesion con tu correo.
+          </p>
+
+          {canChangePassword ? (
+            <form onSubmit={handleChangePassword} className="mt-5 space-y-4">
+              <PasswordField
+                id="profile-current-password"
+                label="Contrasena actual"
+                value={currentPassword}
+                onChange={setCurrentPassword}
+                autoComplete="current-password"
+              />
+
+              <PasswordField
+                id="profile-new-password"
+                label="Nueva contrasena"
+                value={newPassword}
+                onChange={setNewPassword}
+                autoComplete="new-password"
+                showRules
+              />
+
+              <PasswordField
+                id="profile-confirm-password"
+                label="Confirmar nueva contrasena"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
+              />
+
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="btn-primary w-full disabled:opacity-60"
+              >
+                {savingPassword ? "Actualizando..." : "Cambiar contrasena"}
+              </button>
+            </form>
+          ) : (
+            <div className="mt-5 rounded-2xl bg-[#eef2f7] p-4">
+              <p className="text-sm leading-6 text-[var(--on-surface)]">
+                Tu cuenta ingreso con Google y todavia no tiene una contrasena
+                local. Crea una para iniciar tambien con correo y contrasena.
+              </p>
+
+              <Link
+                href="/auth/set-password?next=%2Fprofile"
+                className="btn-primary mt-4 w-full sm:w-auto"
+              >
+                Crear contrasena
+              </Link>
+            </div>
+          )}
+        </section>
 
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/" className="btn-soft">

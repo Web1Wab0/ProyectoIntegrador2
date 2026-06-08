@@ -9,6 +9,7 @@ import {
   getPasswordHelpMessage,
   isStrongPassword,
 } from "../../../lib/auth/password";
+import { hasPasswordSet } from "../../../lib/auth/password-state";
 import { getDefaultPathForRole, getSafeInternalPath } from "../../../lib/auth/redirect";
 import {
   buildFullName,
@@ -54,6 +55,11 @@ function SetPasswordForm() {
 
         if (error || !user) {
           window.location.replace("/auth/sign-in");
+          return;
+        }
+
+        if (hasPasswordSet(user)) {
+          window.location.replace("/profile");
           return;
         }
 
