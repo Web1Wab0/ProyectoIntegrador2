@@ -19,6 +19,19 @@ where t.tgrelid = 'auth.users'::regclass
   and not t.tgisinternal
 order by t.tgname;
 
+-- If this returns rows, those columns can also block signup because the
+-- profile trigger cannot provide a value for unknown required fields.
+select
+  'profiles_required_columns_without_default' as check_name,
+  column_name,
+  data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'profiles'
+  and is_nullable = 'NO'
+  and column_default is null
+  and column_name not in ('id');
+
 begin;
 
 -- 2) Make sure the profile table/columns expected by the app exist.
@@ -84,9 +97,27 @@ set role = 'customer'
 where role is null
    or role not in ('customer', 'merchant', 'admin');
 
--- 3) Remove older profile-creation triggers that can conflict or reference
--- outdated columns. The final trigger is recreated below with the canonical
--- name expected by the original database script.
+-- 3) Remove older public auth triggers from this app that can conflict or
+-- reference outdated columns. The final trigger is recreated below with the
+-- canonical name expected by the original database script.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select t.tgname
+    from pg_trigger t
+    join pg_proc p on p.oid = t.tgfoid
+    join pg_namespace n on n.oid = p.pronamespace
+    where t.tgrelid = 'auth.users'::regclass
+      and not t.tgisinternal
+      and n.nspname = 'public'
+  loop
+    execute format('drop trigger if exists %I on auth.users', r.tgname);
+  end loop;
+end;
+$$;
+
 drop trigger if exists on_auth_user_created on auth.users;
 drop trigger if exists on_auth_user_created_profile_v2 on auth.users;
 

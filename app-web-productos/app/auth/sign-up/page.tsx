@@ -23,8 +23,8 @@ const oauthProviders: Array<{
 function getFriendlySignUpErrorMessage(message: string) {
   if (message.toLowerCase().includes("database error saving new user")) {
     return [
-      "No se pudo crear la cuenta porque falta aplicar la correccion de base de datos en Supabase.",
-      "Ejecuta app-web-productos/supabase/fix_auth_signup_profile_trigger.sql en Supabase SQL Editor y vuelve a intentarlo.",
+      "No se pudo crear la cuenta porque la correccion de base de datos de Supabase no esta completa.",
+      "Ejecuta nuevamente app-web-productos/supabase/fix_auth_signup_profile_trigger.sql en Supabase SQL Editor y vuelve a intentarlo.",
     ].join(" ");
   }
 
