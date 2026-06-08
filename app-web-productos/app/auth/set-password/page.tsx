@@ -151,13 +151,17 @@ function SetPasswordForm() {
         throw error;
       }
 
-      await upsertProfileWithFallback(supabase, {
-        userId,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        phone: profile.phone,
-        role,
-      });
+      try {
+        await upsertProfileWithFallback(supabase, {
+          userId,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone,
+          role,
+        });
+      } catch (profileError) {
+        console.error("Password was saved, but profile sync failed", profileError);
+      }
 
       window.location.replace(nextPath || getDefaultPathForRole(role));
     } catch (error) {

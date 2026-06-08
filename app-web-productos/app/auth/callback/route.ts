@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDefaultPathForRole, getSafeInternalPath } from "../../../lib/auth/redirect";
-import { ensureProfileForUser, normalizeRole } from "../../../lib/auth/profile";
+import {
+  ensureProfileForUser,
+  getUserMetadataProfile,
+  normalizeRole,
+  type ProfileDetails,
+} from "../../../lib/auth/profile";
 
 type CookieToSet = {
   name: string;
@@ -82,9 +87,22 @@ export async function GET(request: Request) {
     );
   }
 
-  const profile = await ensureProfileForUser(supabase, user, requestedRole, {
-    preferFallbackRole: cameFromSignUp,
-  });
+  let profile: ProfileDetails;
+
+  try {
+    profile = await ensureProfileForUser(supabase, user, requestedRole, {
+      preferFallbackRole: cameFromSignUp,
+    });
+  } catch (profileError) {
+    console.error("Could not ensure profile during auth callback", profileError);
+
+    const metadataProfile = getUserMetadataProfile(user);
+    profile = {
+      ...metadataProfile,
+      role: cameFromSignUp ? requestedRole : metadataProfile.role,
+    };
+  }
+
   const userMetadata = user.user_metadata ?? {};
   const passwordAlreadySet = userMetadata.password_set === true;
   const defaultTargetPath = profile.role
