@@ -124,6 +124,8 @@ type RawFallbackProduct = {
 
 type RawFallbackStoreProduct = {
   id: string;
+  stock: number | null;
+  is_available: boolean | null;
   products: MaybeArray<RawFallbackProduct>;
 };
 
@@ -134,6 +136,7 @@ type RawFallbackStore = {
   district: string | null;
   latitude: number;
   longitude: number;
+  opening_hours?: unknown;
   store_products: RawFallbackStoreProduct[] | null;
 };
 
@@ -384,8 +387,11 @@ export default function SearchPage() {
           district,
           latitude,
           longitude,
+          opening_hours,
           store_products (
             id,
+            stock,
+            is_available,
             products:product_id (
               category_id,
               categories:category_id (
@@ -403,7 +409,11 @@ export default function SearchPage() {
 
       return ((data as RawFallbackStore[]) ?? [])
         .map((store) => {
-          const storeProducts = store.store_products ?? [];
+          const availableStoreProducts = (store.store_products ?? []).filter(
+            (storeProduct) =>
+              storeProduct.is_available !== false &&
+              Number(storeProduct.stock ?? 0) > 0
+          );
           const distance = distanceInMeters(
             lat,
             lng,
@@ -411,13 +421,13 @@ export default function SearchPage() {
             Number(store.longitude)
           );
 
-          if (storeProducts.length === 0 || distance > Number(radius)) {
+          if (distance > Number(radius)) {
             return null;
           }
 
           const categoriesByKey = new Map<string, StoreCategory>();
 
-          storeProducts.forEach((storeProduct) => {
+          availableStoreProducts.forEach((storeProduct) => {
             const product = firstOrNull(storeProduct.products);
             const category = firstOrNull(product?.categories);
             const categoryId = category?.id ?? product?.category_id ?? null;
@@ -440,8 +450,8 @@ export default function SearchPage() {
             latitude: Number(store.latitude),
             longitude: Number(store.longitude),
             distance_meters: distance,
-            product_count: storeProducts.length,
-            opening_hours: normalizeOpeningHours(null),
+            product_count: availableStoreProducts.length,
+            opening_hours: normalizeOpeningHours(store.opening_hours),
             categories: Array.from(categoriesByKey.values()).sort((a, b) =>
               a.category_name.localeCompare(b.category_name)
             ),

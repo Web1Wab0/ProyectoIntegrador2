@@ -437,7 +437,7 @@ export default function MerchantSetupPage() {
         .insert({
           business_id: currentBusinessId,
           ...storePayload,
-          status: "pending",
+          status: "active",
           is_active: true,
         })
         .select("id")
@@ -449,7 +449,7 @@ export default function MerchantSetupPage() {
           .insert({
             business_id: currentBusinessId,
             ...storePayloadBase,
-            status: "pending",
+            status: "active",
             is_active: true,
           })
           .select("id")
