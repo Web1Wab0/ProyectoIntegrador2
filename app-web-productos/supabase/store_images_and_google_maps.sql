@@ -1,14 +1,101 @@
 -- =========================================================
--- AHORRAPE - SHOW ALL ACTIVE STORES ON MAP
--- Run this complete file in Supabase SQL Editor.
--- It publishes existing pending stores and updates search_nearby_stores so
--- stores can appear on the map even before products are added.
+-- AHORRAPE - STORE IMAGES + NEARBY STORES FOR AIRBNB-LIKE UI
+-- Run this complete file in Supabase SQL Editor before deploying/testing.
 -- =========================================================
 
 begin;
 
 alter table public.stores
   add column if not exists image_url text;
+
+comment on column public.stores.image_url is
+  'Public URL for the main store image shown in the customer explorer.';
+
+insert into storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+values (
+  'store-images',
+  'store-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists store_images_public_read on storage.objects;
+drop policy if exists store_images_merchant_insert_own on storage.objects;
+drop policy if exists store_images_merchant_update_own on storage.objects;
+drop policy if exists store_images_merchant_delete_own on storage.objects;
+
+create policy store_images_public_read
+on storage.objects
+for select
+to public
+using (bucket_id = 'store-images');
+
+create policy store_images_merchant_insert_own
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'store-images'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role::text in ('merchant', 'admin')
+  )
+);
+
+create policy store_images_merchant_update_own
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'store-images'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role::text in ('merchant', 'admin')
+  )
+)
+with check (
+  bucket_id = 'store-images'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role::text in ('merchant', 'admin')
+  )
+);
+
+create policy store_images_merchant_delete_own
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'store-images'
+  and (storage.foldername(name))[1] = auth.uid()::text
+  and exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role::text in ('merchant', 'admin')
+  )
+);
 
 update public.stores
 set
@@ -163,9 +250,17 @@ grant execute on function public.search_nearby_stores(
 commit;
 
 select
-  status,
-  is_active,
-  count(*) as store_count
-from public.stores
-group by status, is_active
-order by status, is_active;
+  column_name,
+  data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'stores'
+  and column_name = 'image_url';
+
+select
+  id,
+  public,
+  file_size_limit,
+  allowed_mime_types
+from storage.buckets
+where id = 'store-images';

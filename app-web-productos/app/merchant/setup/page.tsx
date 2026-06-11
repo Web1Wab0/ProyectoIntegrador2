@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import {
@@ -46,6 +47,7 @@ type StoreRow = {
   latitude: number;
   longitude: number;
   description?: string | null;
+  image_url?: string | null;
   opening_hours?: unknown;
 };
 
@@ -55,6 +57,25 @@ type AddressSelection = {
   city?: string;
   country?: string;
 };
+
+const MAX_STORE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_STORE_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+function validateStoreImage(file: File) {
+  if (!ALLOWED_STORE_IMAGE_EXTENSIONS[file.type]) {
+    return "La imagen de la tienda debe ser JPG, PNG o WebP.";
+  }
+
+  if (file.size > MAX_STORE_IMAGE_SIZE_BYTES) {
+    return "La imagen de la tienda no debe superar los 5 MB.";
+  }
+
+  return null;
+}
 
 function isMissingColumnError(error: { code?: string; message?: string } | null) {
   if (!error) return false;
@@ -69,6 +90,7 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
 export default function MerchantSetupPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const storeImageObjectUrlRef = useRef<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,6 +106,9 @@ export default function MerchantSetupPage() {
 
   const [storeName, setStoreName] = useState("");
   const [storeDescription, setStoreDescription] = useState("");
+  const [storeImageUrl, setStoreImageUrl] = useState("");
+  const [storeImageFile, setStoreImageFile] = useState<File | null>(null);
+  const [storeImagePreviewUrl, setStoreImagePreviewUrl] = useState("");
   const [addressText, setAddressText] = useState("");
   const [district, setDistrict] = useState("");
   const [city, setCity] = useState("Ica");
@@ -127,6 +152,69 @@ export default function MerchantSetupPage() {
     }
   }
 
+  function handleStoreImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0] ?? null;
+
+    if (storeImageObjectUrlRef.current) {
+      URL.revokeObjectURL(storeImageObjectUrlRef.current);
+      storeImageObjectUrlRef.current = null;
+    }
+
+    if (!selectedFile) {
+      setStoreImageFile(null);
+      setStoreImagePreviewUrl(storeImageUrl);
+      return;
+    }
+
+    const imageError = validateStoreImage(selectedFile);
+
+    if (imageError) {
+      setStoreImageFile(null);
+      setMessage(imageError);
+      e.target.value = "";
+      return;
+    }
+
+    setStoreImageFile(selectedFile);
+    const previewUrl = URL.createObjectURL(selectedFile);
+    storeImageObjectUrlRef.current = previewUrl;
+    setStoreImagePreviewUrl(previewUrl);
+    setMessage("");
+  }
+
+  async function uploadStoreImageIfNeeded(userId: string, currentStoreId: string) {
+    if (!storeImageFile) return storeImageUrl || null;
+
+    const imageError = validateStoreImage(storeImageFile);
+
+    if (imageError) {
+      throw new Error(imageError);
+    }
+
+    const fileExt = ALLOWED_STORE_IMAGE_EXTENSIONS[storeImageFile.type];
+    const fileName = `${currentStoreId}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.${fileExt}`;
+    const filePath = `${userId}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("store-images")
+      .upload(filePath, storeImageFile, {
+        upsert: false,
+        contentType: storeImageFile.type,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data } = supabase.storage
+      .from("store-images")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  }
+
   function updateOpeningDay(
     dayKey: string,
     updates: Partial<StoreOpeningHours[string]>
@@ -139,6 +227,14 @@ export default function MerchantSetupPage() {
       },
     }));
   }
+
+  useEffect(() => {
+    return () => {
+      if (storeImageObjectUrlRef.current) {
+        URL.revokeObjectURL(storeImageObjectUrlRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -192,7 +288,7 @@ export default function MerchantSetupPage() {
         const storeWithHours = await supabase
           .from("stores")
           .select(
-            "id, store_name, description, address_text, district, city, country, latitude, longitude, opening_hours"
+            "id, store_name, description, image_url, address_text, district, city, country, latitude, longitude, opening_hours"
           )
           .eq("business_id", businessData.id)
           .order("updated_at", { ascending: false })
@@ -225,6 +321,8 @@ export default function MerchantSetupPage() {
           setStoreDescription(
             storeData.description ?? businessData.description ?? ""
           );
+          setStoreImageUrl(storeData.image_url ?? "");
+          setStoreImagePreviewUrl(storeData.image_url ?? "");
           setAddressText(storeData.address_text ?? "");
           setDistrict(storeData.district ?? "");
           setCity(storeData.city ?? "Ica");
@@ -471,6 +569,7 @@ export default function MerchantSetupPage() {
         return;
       }
 
+      currentStoreId = createdStore.id;
       setStoreId(createdStore.id);
     } else {
       let { error: storeUpdateError } = await supabase
@@ -489,6 +588,44 @@ export default function MerchantSetupPage() {
 
       if (storeUpdateError) {
         setMessage(storeUpdateError.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (currentStoreId && storeImageFile) {
+      try {
+        const uploadedStoreImageUrl = await uploadStoreImageIfNeeded(
+          user.id,
+          currentStoreId
+        );
+
+        const { error: imageUpdateError } = await supabase
+          .from("stores")
+          .update({ image_url: uploadedStoreImageUrl })
+          .eq("id", currentStoreId);
+
+        if (imageUpdateError) {
+          if (isMissingColumnError(imageUpdateError)) {
+            setMessage(
+              "La tienda se guardo, pero falta ejecutar supabase/store_images_and_google_maps.sql para guardar la imagen."
+            );
+          } else {
+            setMessage(imageUpdateError.message);
+          }
+          setSaving(false);
+          return;
+        }
+
+        setStoreImageUrl(uploadedStoreImageUrl ?? "");
+        setStoreImagePreviewUrl(uploadedStoreImageUrl ?? "");
+        setStoreImageFile(null);
+      } catch (imageError) {
+        setMessage(
+          imageError instanceof Error
+            ? imageError.message
+            : "No se pudo subir la imagen de la tienda."
+        );
         setSaving(false);
         return;
       }
@@ -613,6 +750,40 @@ export default function MerchantSetupPage() {
                   rows={4}
                   className="app-input"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-2 block small-label">
+                  Imagen de la tienda
+                </label>
+                <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
+                  <div className="relative flex h-40 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#eef2f7]">
+                    {storeImagePreviewUrl ? (
+                      <Image
+                        src={storeImagePreviewUrl}
+                        alt={storeName || "Imagen de tienda"}
+                        fill
+                        sizes="220px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm text-muted">Sin imagen</span>
+                    )}
+                  </div>
+
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleStoreImageFileChange}
+                      className="app-input"
+                    />
+                    <p className="mt-2 text-xs text-muted">
+                      Usa una foto clara del local. Formatos JPG, PNG o WebP,
+                      maximo 5 MB.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="md:col-span-2">

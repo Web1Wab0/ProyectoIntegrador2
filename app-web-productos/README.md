@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AhorraPe
 
-## Getting Started
+Aplicación web Next.js para buscar tiendas cercanas, comparar productos en mapa y reservar productos para recojo.
 
-First, run the development server:
+## Variables de entorno
+
+Configura estas variables en `.env.local` y en Vercel:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La clave de Google Maps debe tener habilitadas las APIs:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Maps JavaScript API
+- Geocoding API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+En producción restringe la clave por HTTP referrer, por ejemplo:
 
-## Learn More
+```text
+https://app-web-productos.vercel.app/*
+http://localhost:3000/*
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Supabase
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Antes de probar la versión con foto de tienda y mapa tipo Airbnb, ejecuta en Supabase SQL Editor:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+supabase/store_images_and_google_maps.sql
+```
 
-## Deploy on Vercel
+Ese SQL agrega `stores.image_url`, crea el bucket público `store-images`, configura políticas de Storage y actualiza `search_nearby_stores`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Comandos
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+npm audit --omit=dev
+```
+
+## Deploy
+
+El proyecto está preparado para Vercel con root directory `app-web-productos`.
+
+Si usas CLI:
+
+```bash
+npx vercel login
+npx vercel --prod
+```

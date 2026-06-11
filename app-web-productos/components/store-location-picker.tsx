@@ -1,43 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  CircleMarker,
-  MapContainer,
-  Popup,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from "react-leaflet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { loadGoogleGeocoding, loadGoogleMaps } from "../lib/google-maps";
 
 type AddressSelection = {
   addressText?: string;
   district?: string;
   city?: string;
   country?: string;
-};
-
-type NominatimAddress = {
-  road?: string;
-  pedestrian?: string;
-  footway?: string;
-  house_number?: string;
-  suburb?: string;
-  city_district?: string;
-  district?: string;
-  city?: string;
-  town?: string;
-  village?: string;
-  state?: string;
-  country?: string;
-};
-
-type NominatimPlace = {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  address?: NominatimAddress;
 };
 
 type Props = {
@@ -49,39 +19,50 @@ type Props = {
   onAddressSelect: (selection: AddressSelection) => void;
 };
 
-const DEFAULT_CENTER: [number, number] = [-14.0678, -75.7286];
+type SearchResult = {
+  placeId: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+  selection: AddressSelection;
+};
 
-function buildAddressSelection(place: NominatimPlace): AddressSelection {
-  const address = place.address ?? {};
-  const street = address.road ?? address.pedestrian ?? address.footway;
-  const addressText = [street, address.house_number].filter(Boolean).join(" ");
+const DEFAULT_CENTER = { lat: -14.0678, lng: -75.7286 };
+
+function componentValue(
+  components: google.maps.GeocoderAddressComponent[],
+  type: string
+) {
+  return components.find((component) => component.types.includes(type))
+    ?.long_name;
+}
+
+function buildAddressSelection(
+  result: google.maps.GeocoderResult
+): AddressSelection {
+  const components = result.address_components ?? [];
+  const street = componentValue(components, "route");
+  const number = componentValue(components, "street_number");
+  const district =
+    componentValue(components, "sublocality") ??
+    componentValue(components, "administrative_area_level_3") ??
+    componentValue(components, "administrative_area_level_2");
+  const city =
+    componentValue(components, "locality") ??
+    componentValue(components, "administrative_area_level_2");
+  const country = componentValue(components, "country");
 
   return {
-    addressText: addressText || place.display_name,
-    district: address.suburb ?? address.city_district ?? address.district,
-    city: address.city ?? address.town ?? address.village ?? address.state,
-    country: address.country,
+    addressText: [street, number].filter(Boolean).join(" ") || result.formatted_address,
+    district,
+    city,
+    country,
   };
 }
 
-function RecenterMap({ center }: { center: [number, number] }) {
-  const map = useMap();
-  map.setView(center, map.getZoom(), { animate: true });
-  return null;
-}
-
-function ClickToSelect({
-  onLocationChange,
-}: {
-  onLocationChange: (latitude: number, longitude: number) => void;
-}) {
-  useMapEvents({
-    click(event) {
-      onLocationChange(event.latlng.lat, event.latlng.lng);
-    },
-  });
-
-  return null;
+function selectedPosition(latitude: number | null, longitude: number | null) {
+  if (latitude === null || longitude === null) return DEFAULT_CENTER;
+  return { lat: latitude, lng: longitude };
 }
 
 export default function StoreLocationPicker({
@@ -92,15 +73,87 @@ export default function StoreLocationPicker({
   onLocationChange,
   onAddressSelect,
 }: Props) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NominatimPlace[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState("");
 
-  const center = useMemo<[number, number]>(() => {
-    if (latitude !== null && longitude !== null) return [latitude, longitude];
-    return DEFAULT_CENTER;
-  }, [latitude, longitude]);
+  const center = useMemo(
+    () => selectedPosition(latitude, longitude),
+    [latitude, longitude]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function initMap() {
+      if (!containerRef.current || mapRef.current) return;
+
+      try {
+        const [{ Map }, { Geocoder }] = await Promise.all([
+          loadGoogleMaps(),
+          loadGoogleGeocoding(),
+        ]);
+
+        if (!mounted || !containerRef.current) return;
+
+        const map = new Map(containerRef.current, {
+          center,
+          zoom: 16,
+          clickableIcons: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+        });
+
+        const marker = new google.maps.Marker({
+          position: center,
+          map,
+          draggable: true,
+          title: "Ubicacion seleccionada",
+        });
+
+        marker.addListener("dragend", () => {
+          const nextPosition = marker.getPosition();
+          if (!nextPosition) return;
+          onLocationChange(nextPosition.lat(), nextPosition.lng());
+        });
+
+        map.addListener("click", (event: google.maps.MapMouseEvent) => {
+          if (!event.latLng) return;
+          onLocationChange(event.latLng.lat(), event.latLng.lng());
+        });
+
+        mapRef.current = map;
+        markerRef.current = marker;
+        geocoderRef.current = new Geocoder();
+      } catch (error) {
+        const err = error as Error;
+        setMessage(err.message || "No se pudo cargar Google Maps.");
+      }
+    }
+
+    void initMap();
+
+    return () => {
+      mounted = false;
+    };
+  }, [center, onLocationChange]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const marker = markerRef.current;
+
+    if (!map || !marker) return;
+
+    marker.setPosition(center);
+    map.panTo(center);
+  }, [center]);
 
   async function handleSearchAddress() {
     const searchText = query.trim();
@@ -112,27 +165,37 @@ export default function StoreLocationPicker({
     setSearching(true);
     setMessage("");
 
-    const params = new URLSearchParams({
-      format: "json",
-      addressdetails: "1",
-      limit: "5",
-      countrycodes: "pe",
-      q: `${searchText}, ${city || "Ica"}, ${country || "Peru"}`,
-    });
-
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error("No se pudo buscar la direccion.");
+      if (!geocoderRef.current) {
+        const { Geocoder } = await loadGoogleGeocoding();
+        geocoderRef.current = new Geocoder();
       }
 
-      const places = (await response.json()) as NominatimPlace[];
-      setResults(places);
+      const requestAddress = `${searchText}, ${city || "Ica"}, ${
+        country || "Peru"
+      }`;
+      const response = await geocoderRef.current.geocode({
+        address: requestAddress,
+        componentRestrictions: { country: "PE" },
+      });
 
-      if (places.length === 0) {
+      const nextResults = response.results
+        .map((result) => {
+          const location = result.geometry.location;
+
+          return {
+            placeId: result.place_id,
+            label: result.formatted_address,
+            latitude: location.lat(),
+            longitude: location.lng(),
+            selection: buildAddressSelection(result),
+          };
+        })
+        .slice(0, 5);
+
+      setResults(nextResults);
+
+      if (nextResults.length === 0) {
         setMessage("No se encontraron resultados para esa direccion.");
       }
     } catch (error) {
@@ -143,18 +206,10 @@ export default function StoreLocationPicker({
     }
   }
 
-  function handleSelectPlace(place: NominatimPlace) {
-    const nextLat = Number(place.lat);
-    const nextLng = Number(place.lon);
-
-    if (Number.isNaN(nextLat) || Number.isNaN(nextLng)) {
-      setMessage("El resultado no tiene coordenadas validas.");
-      return;
-    }
-
-    onLocationChange(nextLat, nextLng);
-    onAddressSelect(buildAddressSelection(place));
-    setQuery(place.display_name);
+  function handleSelectPlace(result: SearchResult) {
+    onLocationChange(result.latitude, result.longitude);
+    onAddressSelect(result.selection);
+    setQuery(result.label);
     setResults([]);
     setMessage("Ubicacion seleccionada desde la busqueda.");
   }
@@ -190,52 +245,26 @@ export default function StoreLocationPicker({
 
       {results.length > 0 && (
         <div className="space-y-2">
-          {results.map((place) => (
+          {results.map((result) => (
             <button
-              key={place.place_id}
+              key={result.placeId}
               type="button"
-              onClick={() => handleSelectPlace(place)}
+              onClick={() => handleSelectPlace(result)}
               className="app-card-soft block w-full p-3 text-left text-sm transition hover:brightness-95"
             >
-              {place.display_name}
+              {result.label}
             </button>
           ))}
         </div>
       )}
 
-      <div className="h-[300px] w-full overflow-hidden rounded-2xl sm:h-[360px]">
-        <MapContainer
-          center={center}
-          zoom={16}
-          scrollWheelZoom={true}
-          className="h-full w-full"
-        >
-          <RecenterMap center={center} />
-          <ClickToSelect onLocationChange={onLocationChange} />
-
-          <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <CircleMarker
-            center={center}
-            radius={10}
-            pathOptions={{
-              color: "#f97316",
-              fillColor: "#fb923c",
-              fillOpacity: 0.85,
-              weight: 3,
-            }}
-          >
-            <Popup>Ubicacion seleccionada</Popup>
-          </CircleMarker>
-        </MapContainer>
+      <div className="h-[300px] w-full overflow-hidden rounded-2xl bg-[#eef1f4] sm:h-[360px]">
+        <div ref={containerRef} className="h-full w-full" />
       </div>
 
       <p className="text-sm text-muted">
-        Tambien puedes hacer clic directamente en el mapa para ajustar el punto
-        exacto del local.
+        Puedes hacer clic en el mapa o arrastrar el marcador para ajustar el
+        punto exacto del local.
       </p>
     </div>
   );

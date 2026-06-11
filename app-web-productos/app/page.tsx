@@ -4,13 +4,9 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/client";
 import {
   formatOpeningHours,
-  getAvailablePickupSlots,
-  getOpeningDayForDate,
-  getTodayDateInput,
   normalizeOpeningHours,
   type StoreOpeningHours,
 } from "../lib/store-hours";
@@ -53,6 +49,8 @@ type StoreCategory = {
 type NearbyStore = {
   store_id: string;
   store_name: string;
+  description: string | null;
+  image_url: string | null;
   address_text: string;
   district: string | null;
   latitude: number;
@@ -63,55 +61,14 @@ type NearbyStore = {
   opening_hours: StoreOpeningHours;
 };
 
-type StoreCatalogItem = {
-  id: string;
-  price: number;
-  stock: number;
-  image_url: string | null;
-  is_available: boolean;
-  product: {
-    id: string;
-    product_name: string;
-    description: string | null;
-    brand: string | null;
-    category_id: string | null;
-    category_name: string;
-  } | null;
-};
-
-type CartItem = {
-  store_product_id: string;
-  product_name: string;
-  price: number;
-  quantity: number;
-  image_url: string | null;
-  stock: number;
-};
-
 type MaybeArray<T> = T | T[] | null;
-
-type StoreCatalogCategory = {
-  id: string;
-  name: string;
-};
-
-type RawStoreCatalogProduct = {
-  id: string;
-  product_name: string;
-  description: string | null;
-  brand: string | null;
-  category_id: string | null;
-  category: MaybeArray<StoreCatalogCategory>;
-};
-
-type RawStoreCatalogItem = Omit<StoreCatalogItem, "product"> & {
-  product: MaybeArray<RawStoreCatalogProduct>;
-};
 
 type RawNearbyStore = Omit<
   NearbyStore,
-  "categories" | "product_count"
+  "categories" | "product_count" | "opening_hours" | "description" | "image_url"
 > & {
+  description?: string | null;
+  image_url?: string | null;
   product_count: number | string | null;
   categories: unknown;
   opening_hours?: unknown;
@@ -119,7 +76,10 @@ type RawNearbyStore = Omit<
 
 type RawFallbackProduct = {
   category_id: string | null;
-  categories: MaybeArray<StoreCatalogCategory>;
+  categories: MaybeArray<{
+    id: string;
+    name: string;
+  }>;
 };
 
 type RawFallbackStoreProduct = {
@@ -132,6 +92,8 @@ type RawFallbackStoreProduct = {
 type RawFallbackStore = {
   id: string;
   store_name: string;
+  description?: string | null;
+  image_url?: string | null;
   address_text: string;
   district: string | null;
   latitude: number;
@@ -146,33 +108,12 @@ type RawSearchResult = Omit<SearchResult, "opening_hours"> & {
 
 type SupabaseQueryResponse<T> = {
   data: T | null;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
 };
 
 function firstOrNull<T>(value: MaybeArray<T> | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
-}
-
-function normalizeStoreCatalogItem(
-  item: RawStoreCatalogItem
-): StoreCatalogItem {
-  const product = firstOrNull(item.product);
-  const category = firstOrNull(product?.category);
-
-  return {
-    ...item,
-    product: product
-      ? {
-          id: product.id,
-          product_name: product.product_name,
-          description: product.description,
-          brand: product.brand,
-          category_id: category?.id ?? product.category_id ?? null,
-          category_name: category?.name ?? "Sin categoria",
-        }
-      : null,
-  };
 }
 
 function normalizeStoreCategories(value: unknown): StoreCategory[] {
@@ -204,6 +145,8 @@ function normalizeStoreCategories(value: unknown): StoreCategory[] {
 function normalizeNearbyStore(row: RawNearbyStore): NearbyStore {
   return {
     ...row,
+    description: row.description ?? null,
+    image_url: row.image_url ?? null,
     product_count: Number(row.product_count ?? 0),
     categories: normalizeStoreCategories(row.categories),
     opening_hours: normalizeOpeningHours(row.opening_hours),
@@ -245,6 +188,53 @@ function formatDistance(meters: number) {
   return `${Math.round(meters)} m`;
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+
+  return (
+    error.code === "42703" ||
+    error.message?.toLowerCase().includes("column") ||
+    error.message?.toLowerCase().includes("schema cache")
+  );
+}
+
+function storeHref(storeId: string, storeProductId?: string) {
+  const params = storeProductId
+    ? `?product=${encodeURIComponent(storeProductId)}`
+    : "";
+  return `/stores/${encodeURIComponent(storeId)}${params}`;
+}
+
+function StoreImage({
+  src,
+  alt,
+  className = "h-56",
+}: {
+  src: string | null;
+  alt: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`${className} relative flex w-full items-center justify-center overflow-hidden rounded-3xl bg-[#eef1f4]`}
+    >
+      {src ? (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 768px) 100vw, 420px"
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f7f7f7] to-[#e9edf2] text-sm font-semibold text-muted">
+          Sin imagen
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SearchPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -257,12 +247,12 @@ export default function SearchPage() {
   } | null>(null);
 
   const [search, setSearch] = useState("");
+  const [lastSearch, setLastSearch] = useState("");
   const [radius, setRadius] = useState("3000");
-  const [quantityById, setQuantityById] = useState<Record<string, number>>({});
   const [results, setResults] = useState<SearchResult[]>([]);
   const [nearbyStores, setNearbyStores] = useState<NearbyStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [activeCategoryId, setActiveCategoryId] = useState("all");
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -270,119 +260,16 @@ export default function SearchPage() {
   const [loadingStores, setLoadingStores] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  const [cartStoreId, setCartStoreId] = useState<string | null>(null);
-  const [cartStoreName, setCartStoreName] = useState("");
-  const [cartStoreAddress, setCartStoreAddress] = useState("");
-  const [cartStoreOpeningHours, setCartStoreOpeningHours] =
-    useState<StoreOpeningHours>(() => normalizeOpeningHours(null));
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [pickupDate, setPickupDate] = useState(() => getTodayDateInput());
-  const [pickupTime, setPickupTime] = useState("");
-  const [reservationNotes, setReservationNotes] = useState("");
-  const [storeCatalog, setStoreCatalog] = useState<StoreCatalogItem[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
-  const [creatingReservation, setCreatingReservation] = useState(false);
-
-  const applySessionUser = useCallback((user: User | null) => {
-    if (!user) {
-      setCurrentUserId(null);
-      setCurrentRole(null);
-      setAuthLoading(false);
-      return;
-    }
-
-    setCurrentUserId(user.id);
-    setCurrentRole(
-      typeof user.user_metadata?.role === "string"
-        ? user.user_metadata.role
-        : null
-    );
-    setAuthLoading(false);
-  }, []);
-
-  const loadRoleForUser = useCallback(
-    async (userId: string) => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error) return null;
-
-      return typeof data?.role === "string" ? data.role : null;
-    },
-    [supabase]
-  );
-
-  useEffect(() => {
-    let mounted = true;
-    let roleTimer: number | null = null;
-
-    function scheduleRoleLoad(user: User) {
-      if (roleTimer) window.clearTimeout(roleTimer);
-
-      roleTimer = window.setTimeout(async () => {
-        const role = await loadRoleForUser(user.id);
-
-        if (!mounted || !role) return;
-
-        setCurrentRole(role);
-      }, 0);
-    }
-
-    async function loadSession() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!mounted) return;
-
-        const user = session?.user ?? null;
-        applySessionUser(user);
-
-        if (user) scheduleRoleLoad(user);
-      } catch {
-        if (!mounted) return;
-
-        setCurrentUserId(null);
-        setCurrentRole(null);
-        setAuthLoading(false);
-      }
-    }
-
-    loadSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-
-      const user = session?.user ?? null;
-      applySessionUser(user);
-
-      if (user) scheduleRoleLoad(user);
-    });
-
-    return () => {
-      mounted = false;
-      if (roleTimer) window.clearTimeout(roleTimer);
-      subscription.unsubscribe();
-    };
-  }, [applySessionUser, loadRoleForUser, supabase]);
+  const isSearchMode = results.length > 0;
 
   const loadNearbyStoresFallback = useCallback(
     async (lat: number, lng: number, signal: AbortSignal) => {
-      const { data, error } = await supabase
-        .from("stores")
-        .select(`
+      async function queryStores(includeImage: boolean) {
+        const select = `
           id,
           store_name,
+          description,
+          ${includeImage ? "image_url," : ""}
           address_text,
           district,
           latitude,
@@ -400,14 +287,27 @@ export default function SearchPage() {
               )
             )
           )
-        `)
-        .eq("is_active", true)
-        .eq("status", "active")
-        .abortSignal(signal);
+        `;
+
+        return supabase
+          .from("stores")
+          .select(select)
+          .eq("is_active", true)
+          .eq("status", "active")
+          .abortSignal(signal);
+      }
+
+      let { data, error } = await queryStores(true);
+
+      if (error && isMissingColumnError(error)) {
+        const fallback = await queryStores(false);
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) throw new Error(error.message);
 
-      return ((data as RawFallbackStore[]) ?? [])
+      return (((data as unknown) as RawFallbackStore[]) ?? [])
         .map((store) => {
           const availableStoreProducts = (store.store_products ?? []).filter(
             (storeProduct) =>
@@ -445,6 +345,8 @@ export default function SearchPage() {
           return {
             store_id: store.id,
             store_name: store.store_name,
+            description: store.description ?? null,
+            image_url: store.image_url ?? null,
             address_text: store.address_text,
             district: store.district,
             latitude: Number(store.latitude),
@@ -492,14 +394,6 @@ export default function SearchPage() {
           }
 
           return result;
-        } catch (error) {
-          if (controller.signal.aborted) {
-            throw new Error(
-              "La carga de tiendas tardo demasiado. Intenta nuevamente."
-            );
-          }
-
-          throw error;
         } finally {
           window.clearTimeout(timeoutId);
 
@@ -631,286 +525,16 @@ export default function SearchPage() {
     return () => window.clearTimeout(timer);
   }, [loadNearbyStores, userLat, userLng]);
 
-  const selectedNearbyStore = useMemo(
-    () => nearbyStores.find((store) => store.store_id === selectedStoreId),
-    [nearbyStores, selectedStoreId]
-  );
-
-  const catalogCategories = useMemo(() => {
-    const categoriesByKey = new Map<string, StoreCategory>();
-
-    storeCatalog.forEach((item) => {
-      if (!item.product) return;
-
-      const key = item.product.category_id ?? UNCATEGORIZED_ID;
-      const current = categoriesByKey.get(key);
-
-      categoriesByKey.set(key, {
-        category_id: item.product.category_id,
-        category_name:
-          item.product.category_name ||
-          current?.category_name ||
-          "Sin categoria",
-        product_count: (current?.product_count ?? 0) + 1,
-      });
-    });
-
-    return Array.from(categoriesByKey.values()).sort((a, b) =>
-      a.category_name.localeCompare(b.category_name)
-    );
-  }, [storeCatalog]);
-
-  const filteredStoreCatalog = useMemo(() => {
-    if (activeCategoryId === "all") return storeCatalog;
-
-    return storeCatalog.filter((item) => {
-      const itemCategoryId = item.product?.category_id ?? UNCATEGORIZED_ID;
-      return itemCategoryId === activeCategoryId;
-    });
-  }, [activeCategoryId, storeCatalog]);
-
-  const pickupSlots = useMemo(
-    () => getAvailablePickupSlots(pickupDate, cartStoreOpeningHours),
-    [cartStoreOpeningHours, pickupDate]
-  );
-
-  const selectedPickupDay = useMemo(
-    () => getOpeningDayForDate(pickupDate, cartStoreOpeningHours),
-    [cartStoreOpeningHours, pickupDate]
-  );
-
-  const pickupAt = useMemo(() => {
-    if (!pickupDate || !pickupTime) return "";
-    return `${pickupDate}T${pickupTime}`;
-  }, [pickupDate, pickupTime]);
-
-  useEffect(() => {
-    if (!pickupTime) return;
-
-    const isValidSlot = pickupSlots.some((slot) => slot.value === pickupTime);
-
-    if (!isValidSlot) {
-      setPickupTime("");
-    }
-  }, [pickupSlots, pickupTime]);
-
-  function clearCart() {
-    setCartStoreId(null);
-    setCartStoreName("");
-    setCartStoreAddress("");
-    setCartStoreOpeningHours(normalizeOpeningHours(null));
-    setCartItems([]);
-    setPickupDate(getTodayDateInput());
-    setPickupTime("");
-    setReservationNotes("");
-    setStoreCatalog([]);
-    setSelectedStoreId(null);
-    setActiveCategoryId("all");
-  }
-
-  async function loadStoreCatalog(storeId: string) {
-    setLoadingCatalog(true);
-    setActiveCategoryId("all");
-
-    const { data, error } = await supabase
-      .from("store_products")
-      .select(`
-        id,
-        price,
-        stock,
-        image_url,
-        is_available,
-        product:products!store_products_product_id_fkey (
-          id,
-          product_name,
-          description,
-          brand,
-          category_id,
-          category:categories!products_category_id_fkey (
-            id,
-            name
-          )
-        )
-      `)
-      .eq("store_id", storeId)
-      .eq("is_available", true)
-      .gt("stock", 0)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      setNotice({ type: "error", message: error.message });
-      setLoadingCatalog(false);
-      return;
-    }
-
-    setStoreCatalog(((data as RawStoreCatalogItem[]) ?? []).map(normalizeStoreCatalogItem));
-    setLoadingCatalog(false);
-  }
-
-  async function prepareCartStore(
-    storeId: string,
-    storeName: string,
-    storeAddress: string,
-    openingHours: StoreOpeningHours
-  ) {
-    if (cartStoreId && cartStoreId !== storeId) {
-      const confirmed = window.confirm(
-        "Tu reserva actual pertenece a otro local. Deseas vaciarla y cambiar de tienda?"
-      );
-
-      if (!confirmed) return false;
-
-      clearCart();
-    }
-
-    setSelectedStoreId(storeId);
-    setCartStoreOpeningHours(openingHours);
-
-    if (cartStoreId !== storeId) {
-      setCartStoreId(storeId);
-      setCartStoreName(storeName);
-      setCartStoreAddress(storeAddress);
-      setCartStoreOpeningHours(openingHours);
-      setPickupDate(getTodayDateInput());
-      setPickupTime("");
-      await loadStoreCatalog(storeId);
-    } else if (storeCatalog.length === 0) {
-      await loadStoreCatalog(storeId);
-    }
-
-    return true;
-  }
-
-  async function handleSelectStore(store: NearbyStore) {
-    const ok = await prepareCartStore(
-      store.store_id,
-      store.store_name,
-      store.address_text,
-      store.opening_hours
-    );
-
-    if (!ok) return;
-
-    setNotice({
-      type: "success",
-      message: `Viendo productos de ${store.store_name}.`,
-    });
-  }
-
-  function addItemToCart(item: CartItem) {
-    setCartItems((prev) => {
-      const existing = prev.find(
-        (x) => x.store_product_id === item.store_product_id
-      );
-
-      if (!existing) {
-        return [...prev, item];
-      }
-
-      const nextQty = existing.quantity + item.quantity;
-
-      if (nextQty > item.stock) {
-        setNotice({
-          type: "warning",
-          message: `No puedes agregar mas de ${item.stock} unidades de ${item.product_name}.`,
-        });
-        return prev;
-      }
-
-      return prev.map((x) =>
-        x.store_product_id === item.store_product_id
-          ? { ...x, quantity: nextQty }
-          : x
-      );
-    });
-  }
-
-  async function handleAddSearchResult(item: SearchResult) {
-    const ok = await prepareCartStore(
-      item.store_id,
-      item.store_name,
-      item.address_text,
-      item.opening_hours
-    );
-
-    if (!ok) return;
-
-    const qty = quantityById[item.store_product_id] ?? 1;
-
-    if (qty <= 0 || qty > item.stock) {
-      setNotice({
-        type: "warning",
-        message: `La cantidad debe estar entre 1 y ${item.stock}.`,
-      });
-      return;
-    }
-
-    addItemToCart({
-      store_product_id: item.store_product_id,
-      product_name: item.product_name,
-      price: item.price,
-      quantity: qty,
-      image_url: item.image_url,
-      stock: item.stock,
-    });
-
-    setNotice({
-      type: "success",
-      message: `${item.product_name} fue agregado a tu reserva.`,
-    });
-  }
-
-  async function handleAddCatalogItem(item: StoreCatalogItem) {
-    if (!cartStoreId || !item.product) return;
-
-    const qty = quantityById[item.id] ?? 1;
-
-    if (qty <= 0 || qty > item.stock) {
-      setNotice({
-        type: "warning",
-        message: `La cantidad debe estar entre 1 y ${item.stock}.`,
-      });
-      return;
-    }
-
-    addItemToCart({
-      store_product_id: item.id,
-      product_name: item.product.product_name,
-      price: item.price,
-      quantity: qty,
-      image_url: item.image_url,
-      stock: item.stock,
-    });
-
-    setNotice({
-      type: "success",
-      message: `${item.product.product_name} fue agregado a tu reserva.`,
-    });
-  }
-
-  function updateCartItemQuantity(storeProductId: string, quantity: number) {
-    setCartItems((prev) =>
-      prev.map((item) => {
-        if (item.store_product_id !== storeProductId) return item;
-        const safeQty = Math.max(1, Math.min(quantity, item.stock));
-        return { ...item, quantity: safeQty };
-      })
-    );
-  }
-
-  function removeCartItem(storeProductId: string) {
-    setCartItems((prev) =>
-      prev.filter((item) => item.store_product_id !== storeProductId)
-    );
-  }
-
   async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!search.trim()) {
+      setResults([]);
+      setLastSearch("");
+      setSelectedResultId(null);
       setNotice({
         type: "warning",
-        message: "Escribe un producto para buscar.",
+        message: "Escribe un producto para buscar o explora tiendas cercanas.",
       });
       return;
     }
@@ -945,6 +569,9 @@ export default function SearchPage() {
 
     const rows = ((data as RawSearchResult[]) ?? []).map(normalizeSearchResult);
     setResults(rows);
+    setLastSearch(search.trim());
+    setSelectedResultId(rows[0]?.store_product_id ?? null);
+    setSelectedStoreId(rows[0]?.store_id ?? null);
     setSearching(false);
 
     if (rows.length === 0) {
@@ -952,118 +579,47 @@ export default function SearchPage() {
         type: "warning",
         message: "No se encontraron productos cercanos para esa busqueda.",
       });
-    } else {
-      setNotice({
-        type: "success",
-        message: `Se encontraron ${rows.length} productos cercanos.`,
-      });
     }
   }
 
-  async function handleCreateReservation() {
-    if (authLoading) return;
-
-    if (!cartStoreId || cartItems.length === 0) {
-      setNotice({
-        type: "warning",
-        message: "Primero agrega productos a tu reserva.",
-      });
-      return;
-    }
-
-    if (!pickupDate || !pickupTime || !pickupAt) {
-      setNotice({
-        type: "warning",
-        message: "Debes elegir una fecha y hora de recojo disponible.",
-      });
-      return;
-    }
-
-    if (!pickupSlots.some((slot) => slot.value === pickupTime)) {
-      setNotice({
-        type: "warning",
-        message: "La tienda esta cerrada en ese horario. Elige otra hora.",
-      });
-      return;
-    }
-
-    if (!currentUserId) {
-      setNotice({
-        type: "warning",
-        message: "Debes iniciar sesion como cliente para reservar.",
-      });
-      router.push("/auth/sign-in?next=/");
-      return;
-    }
-
-    if (currentRole !== "customer") {
-      setNotice({
-        type: "warning",
-        message: "Solo las cuentas de cliente pueden confirmar reservas.",
-      });
-      return;
-    }
-
-    setCreatingReservation(true);
-
-    const { error } = await supabase.rpc("create_reservation_with_items", {
-      p_store_id: cartStoreId,
-      p_items: cartItems.map((item) => ({
-        store_product_id: item.store_product_id,
-        quantity: item.quantity,
-      })),
-      p_pickup_at: new Date(pickupAt).toISOString(),
-      p_notes: reservationNotes || null,
-    });
-
-    if (error) {
-      setCreatingReservation(false);
-      setNotice({
-        type: "error",
-        message: error.message,
-      });
-      return;
-    }
-
-    clearCart();
-    setCreatingReservation(false);
-
-    setNotice({
-      type: "success",
-      message: "Reserva creada correctamente. Te llevaremos a Mis reservas...",
-    });
-
-    setTimeout(() => {
-      window.location.replace("/customer/reservations");
-    }, 1200);
+  function clearSearch() {
+    setSearch("");
+    setLastSearch("");
+    setResults([]);
+    setSelectedResultId(null);
+    setSelectedStoreId(null);
+    setNotice(null);
   }
 
-  const cartTotal = cartItems.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
+  const storesTitle = useMemo(() => {
+    if (userLat === null || userLng === null) return "Activa tu ubicacion";
+    if (isSearchMode) return `Resultados para "${lastSearch}"`;
+    return "Tiendas cerca de ti";
+  }, [isSearchMode, lastSearch, userLat, userLng]);
 
   return (
-    <main className="app-page">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="mb-4 flex justify-end">
-          <AuthAccessMenu />
-        </div>
+    <main className="min-h-screen bg-white text-[var(--on-surface)]">
+      <div className="border-b border-[#e5e7eb] bg-white">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
+          <div className="flex items-center justify-end">
+            <AuthAccessMenu />
+          </div>
 
-        <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
-          <h1 className="page-title text-3xl sm:text-4xl">
-            Buscar productos cercanos
-          </h1>
-          <p className="mt-3 text-base text-muted">
-            Al ingresar, AhorraPe intenta detectar tu ubicacion para mostrarte
-            tiendas cercanas. Luego puedes elegir una tienda o buscar un producto.
-          </p>
+          <div className="grid gap-4 lg:grid-cols-[1fr_220px] lg:items-end">
+            <div className="min-w-0">
+              <h1 className="page-title text-2xl sm:text-3xl">
+                Encuentra tiendas y productos cerca de ti
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted sm:text-base">
+                Explora locales activos en tu zona o busca un producto para
+                comparar precios directamente en el mapa.
+              </p>
+            </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
             <button
               onClick={requestUserLocation}
               disabled={loadingLocation}
-              className="btn-secondary"
+              className="btn-soft justify-self-start border border-[#d1d5db] bg-white lg:justify-self-end"
             >
               {loadingLocation
                 ? "Detectando ubicacion..."
@@ -1071,30 +627,24 @@ export default function SearchPage() {
                 ? "Reintentar ubicacion"
                 : "Usar mi ubicacion"}
             </button>
-
-            {userLat !== null && userLng !== null && (
-              <div className="max-w-full break-words rounded-2xl app-card-soft px-4 py-3 text-sm text-muted">
-                Lat: {userLat.toFixed(6)} | Lng: {userLng.toFixed(6)}
-              </div>
-            )}
           </div>
 
           <form
             onSubmit={handleSearch}
-            className="mt-5 grid gap-4 md:grid-cols-[1fr_180px_160px]"
+            className="grid gap-3 rounded-full border border-[#d1d5db] bg-white p-2 shadow-sm md:grid-cols-[1fr_150px_120px_auto]"
           >
             <input
               type="text"
-              placeholder="Ejemplo: coca cola, arroz, leche"
+              placeholder="Busca arroz, leche, gaseosa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="app-input"
+              className="min-h-12 rounded-full px-4 text-sm outline-none"
             />
 
             <select
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              className="app-input"
+              className="min-h-12 rounded-full bg-[#f7f7f7] px-4 text-sm outline-none"
             >
               <option value="1000">1 km</option>
               <option value="3000">3 km</option>
@@ -1105,447 +655,185 @@ export default function SearchPage() {
             <button
               type="submit"
               disabled={searching}
-              className="btn-secondary"
+              className="min-h-12 rounded-full bg-[#ff385c] px-5 text-sm font-bold text-white transition hover:bg-[#e03150] disabled:opacity-60"
             >
-              {searching ? "Buscando..." : "Buscar"}
+              {searching ? "Buscando" : "Buscar"}
             </button>
+
+            {isSearchMode && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="min-h-12 rounded-full px-4 text-sm font-semibold text-[#222222] transition hover:bg-[#f7f7f7]"
+              >
+                Ver tiendas
+              </button>
+            )}
           </form>
 
-          <div className="info-box mt-4">
-            Puedes explorar tiendas sin buscar un producto. Para confirmar una
-            reserva, debes iniciar sesion con una cuenta de cliente.
+          {notice && <Notice type={notice.type} message={notice.message} />}
+        </div>
+      </div>
+
+      <div className="mx-auto grid max-w-[1600px] gap-0 lg:grid-cols-[minmax(0,1fr)_48vw]">
+        <section className="min-w-0 px-4 py-6 sm:px-6 lg:px-10">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold sm:text-2xl">{storesTitle}</h2>
+              <p className="mt-1 text-sm text-muted">
+                Radio actual: {Number(radius) / 1000} km
+                {userLat !== null && userLng !== null
+                  ? ` · Tu ubicacion: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`
+                  : ""}
+              </p>
+            </div>
+
+            {loadingStores && !isSearchMode && (
+              <span className="rounded-full bg-[#f7f7f7] px-4 py-2 text-sm text-muted">
+                Cargando tiendas...
+              </span>
+            )}
           </div>
 
-          {notice && (
-            <div className="mt-4">
-              <Notice type={notice.type} message={notice.message} />
+          {userLat === null || userLng === null ? (
+            <div className="rounded-3xl border border-[#e5e7eb] bg-[#f7f7f7] p-6 text-sm text-muted">
+              Acepta el permiso de ubicacion para ver tiendas cercanas en el
+              mapa.
+            </div>
+          ) : isSearchMode ? (
+            <div className="grid gap-x-6 gap-y-8 md:grid-cols-2">
+              {results.map((item) => (
+                <article
+                  key={item.store_product_id}
+                  onMouseEnter={() => {
+                    setSelectedResultId(item.store_product_id);
+                    setSelectedStoreId(item.store_id);
+                  }}
+                  className="group cursor-pointer"
+                  onClick={() =>
+                    router.push(storeHref(item.store_id, item.store_product_id))
+                  }
+                >
+                  <StoreImage
+                    src={item.image_url}
+                    alt={item.product_name}
+                    className="h-64"
+                  />
+
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-[#222222] group-hover:underline">
+                        {item.product_name}
+                      </h3>
+                      <p className="mt-1 truncate text-sm text-muted">
+                        {item.store_name}
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 text-sm font-semibold">
+                      {formatDistance(item.distance_meters)}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 line-clamp-2 text-sm text-muted">
+                    {item.product_description || "Sin descripcion"}
+                  </p>
+
+                  <div className="mt-2 text-sm text-muted">
+                    <span>{item.category_name ?? "Sin categoria"}</span>
+                    <span> · Stock {item.stock}</span>
+                  </div>
+
+                  <p className="mt-2 font-semibold text-[#222222]">
+                    S/ {Number(item.price).toFixed(2)}
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : nearbyStores.length === 0 && !loadingStores ? (
+            <div className="rounded-3xl border border-[#e5e7eb] bg-[#f7f7f7] p-6 text-sm text-muted">
+              No encontramos tiendas activas en este radio. Prueba ampliarlo o
+              vuelve a intentar tu ubicacion.
+            </div>
+          ) : (
+            <div className="grid gap-x-6 gap-y-8 md:grid-cols-2">
+              {nearbyStores.map((store) => (
+                <article
+                  key={store.store_id}
+                  onMouseEnter={() => setSelectedStoreId(store.store_id)}
+                  onClick={() => router.push(storeHref(store.store_id))}
+                  className="group cursor-pointer"
+                >
+                  <StoreImage
+                    src={store.image_url}
+                    alt={store.store_name}
+                    className="h-64"
+                  />
+
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-[#222222] group-hover:underline">
+                        {store.store_name}
+                      </h3>
+                      <p className="mt-1 truncate text-sm text-muted">
+                        {store.address_text}
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 text-sm font-semibold">
+                      {formatDistance(store.distance_meters)}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 line-clamp-2 text-sm text-muted">
+                    {store.description || "Tienda disponible cerca de ti."}
+                  </p>
+
+                  <p className="mt-2 text-xs text-muted">
+                    Horario: {formatOpeningHours(store.opening_hours)}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {store.categories.slice(0, 3).map((category) => (
+                      <span
+                        key={category.category_id ?? UNCATEGORIZED_ID}
+                        className="rounded-full bg-[#f7f7f7] px-3 py-1 text-xs font-medium text-[#222222]"
+                      >
+                        {category.category_name}
+                      </span>
+                    ))}
+                    {store.product_count === 0 && (
+                      <span className="rounded-full bg-[#f7f7f7] px-3 py-1 text-xs font-medium text-muted">
+                        Sin productos aun
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {userLat !== null && userLng !== null && (
-          <div className="rounded-2xl app-card p-3 shadow-lg sm:p-4">
+        <aside className="order-first h-[360px] px-4 pb-4 sm:px-6 lg:sticky lg:top-16 lg:order-none lg:h-[calc(100vh-4rem)] lg:px-0 lg:pb-0">
+          {userLat !== null && userLng !== null ? (
             <SearchMap
               userLat={userLat}
               userLng={userLng}
               results={results}
               stores={nearbyStores}
               selectedStoreId={selectedStoreId}
-              onSelectStore={handleSelectStore}
+              selectedResultId={selectedResultId}
+              onSelectStore={(store) => router.push(storeHref(store.store_id))}
+              onSelectResult={(result) =>
+                router.push(storeHref(result.store_id, result.store_product_id))
+              }
             />
-          </div>
-        )}
-
-        {userLat !== null && userLng !== null && (
-          <section className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="section-title text-2xl">Tiendas cercanas</h2>
-                <p className="mt-2 text-sm text-muted">
-                  Radio actual: {Number(radius) / 1000} km. Selecciona una
-                  tienda para ver sus productos por categoria.
-                </p>
-              </div>
-
-              {loadingStores && (
-                <div className="app-card-soft rounded-2xl px-4 py-3 text-sm text-muted">
-                  Cargando tiendas...
-                </div>
-              )}
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-3xl bg-[#f7f7f7] p-6 text-center text-sm text-muted">
+              El mapa aparecera cuando aceptes compartir tu ubicacion.
             </div>
-
-            {!loadingStores && nearbyStores.length === 0 ? (
-              <div className="info-box mt-4">
-                No encontramos tiendas activas con productos disponibles en este
-                radio.
-              </div>
-            ) : (
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {nearbyStores.map((store) => (
-                  <article
-                    key={store.store_id}
-                    className={`app-card-soft cursor-pointer p-5 transition ${
-                      selectedStoreId === store.store_id
-                        ? "ring-2 ring-[var(--primary)]"
-                        : ""
-                    }`}
-                    onClick={() => handleSelectStore(store)}
-                  >
-                    <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-                      <div className="min-w-0">
-                        <h3 className="section-title text-xl">
-                          {store.store_name}
-                        </h3>
-                        <p className="mt-1 break-words text-sm text-muted">
-                          {store.address_text}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        {formatDistance(store.distance_meters)}
-                      </span>
-                    </div>
-
-                    <p className="mt-3 text-sm text-muted">
-                      {store.product_count} productos disponibles
-                    </p>
-                    <p className="mt-2 text-xs text-muted">
-                      Horario: {formatOpeningHours(store.opening_hours)}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {store.categories.slice(0, 4).map((category) => (
-                        <span
-                          key={category.category_id ?? UNCATEGORIZED_ID}
-                          className="rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-[var(--on-surface)]"
-                        >
-                          {category.category_name}
-                        </span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {cartStoreId && (
-          <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
-            <h2 className="text-2xl font-bold">Mi reserva</h2>
-            <p className="mt-2 text-muted">
-              Local seleccionado:{" "}
-              <span className="font-semibold text-white">{cartStoreName}</span>
-            </p>
-            <p className="text-sm text-muted">{cartStoreAddress}</p>
-            <p className="mt-1 text-xs text-muted">
-              Horario: {formatOpeningHours(cartStoreOpeningHours)}
-            </p>
-
-            {cartItems.length === 0 ? (
-              <div className="mt-4 rounded-xl app-card-soft p-4 text-gray-300">
-                Todavia no agregaste productos.
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.store_product_id}
-                    className="rounded-xl app-card-soft p-4"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div className="min-w-0">
-                        <p className="break-words font-semibold">{item.product_name}</p>
-                        <p className="text-sm text-muted">
-                          S/ {Number(item.price).toFixed(2)} c/u
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <input
-                          type="number"
-                          min="1"
-                          max={item.stock}
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateCartItemQuantity(
-                              item.store_product_id,
-                              Number(e.target.value)
-                            )
-                          }
-                          className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
-                        />
-
-                        <button
-                          onClick={() => removeCartItem(item.store_product_id)}
-                          className="btn-danger"
-                        >
-                          Quitar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="mb-2 block text-sm text-muted">
-                  Fecha de recojo
-                </label>
-                <input
-                  type="date"
-                  value={pickupDate}
-                  min={getTodayDateInput()}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  className="w-full rounded-xl border border-gray-700 app-card-soft px-4 py-3 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-muted">
-                  Hora disponible
-                </label>
-                <select
-                  value={pickupTime}
-                  onChange={(e) => setPickupTime(e.target.value)}
-                  disabled={pickupSlots.length === 0}
-                  className="w-full rounded-xl border border-gray-700 app-card-soft px-4 py-3 outline-none disabled:opacity-60"
-                >
-                  <option value="">
-                    {pickupSlots.length === 0
-                      ? "Sin horarios disponibles"
-                      : "Selecciona una hora"}
-                  </option>
-                  {pickupSlots.map((slot) => (
-                    <option key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </option>
-                  ))}
-                </select>
-                {selectedPickupDay?.closed || pickupSlots.length === 0 ? (
-                  <p className="mt-2 text-xs text-muted">
-                    La tienda no atiende en la fecha seleccionada o ya no hay
-                    horas futuras disponibles.
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-muted">
-                  Nota opcional
-                </label>
-                <input
-                  type="text"
-                  value={reservationNotes}
-                  onChange={(e) => setReservationNotes(e.target.value)}
-                  placeholder="Ejemplo: pasare despues del trabajo"
-                  className="w-full rounded-xl border border-gray-700 app-card-soft px-4 py-3 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-lg font-semibold">
-                Total: S/ {cartTotal.toFixed(2)}
-              </p>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={clearCart}
-                  className="rounded-lg bg-gray-700 px-4 py-3 font-semibold hover:bg-gray-600"
-                >
-                  Vaciar reserva
-                </button>
-
-                <button
-                  onClick={handleCreateReservation}
-                  disabled={creatingReservation}
-                  className="rounded-lg bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-700 disabled:opacity-60"
-                >
-                  {creatingReservation
-                    ? "Confirmando..."
-                    : !currentUserId
-                    ? "Inicia sesion para confirmar"
-                    : currentRole !== "customer"
-                    ? "Solo cliente puede confirmar"
-                    : "Confirmar reserva"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {cartStoreId && (
-          <div className="rounded-2xl app-card p-4 shadow-lg sm:p-6">
-            <h2 className="break-words text-2xl font-bold">
-              Productos de {cartStoreName || selectedNearbyStore?.store_name}
-            </h2>
-            <p className="mt-2 text-muted">
-              Elige una categoria o agrega varios productos de esta misma tienda
-              a tu reserva.
-            </p>
-
-            {loadingCatalog ? (
-              <div className="mt-4 rounded-xl app-card-soft p-4 text-gray-300">
-                Cargando productos del local...
-              </div>
-            ) : storeCatalog.length === 0 ? (
-              <div className="mt-4 rounded-xl app-card-soft p-4 text-gray-300">
-                No hay productos disponibles en esta tienda.
-              </div>
-            ) : (
-              <>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategoryId("all")}
-                    className={
-                      activeCategoryId === "all" ? "btn-primary" : "btn-soft"
-                    }
-                  >
-                    Todos ({storeCatalog.length})
-                  </button>
-
-                  {catalogCategories.map((category) => {
-                    const key = category.category_id ?? UNCATEGORIZED_ID;
-
-                    return (
-                      <button
-                        type="button"
-                        key={key}
-                        onClick={() => setActiveCategoryId(key)}
-                        className={
-                          activeCategoryId === key ? "btn-primary" : "btn-soft"
-                        }
-                      >
-                        {category.category_name} ({category.product_count})
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredStoreCatalog.map((item) => (
-                    <article
-                      key={item.id}
-                      className="rounded-xl app-card-soft p-4"
-                    >
-                      {item.image_url ? (
-                        <div className="mb-4 flex h-40 w-full items-center justify-center overflow-hidden rounded-lg bg-[#eef2f7]">
-                          <Image
-                            src={item.image_url}
-                            alt={item.product?.product_name ?? "Producto"}
-                            width={400}
-                            height={220}
-                            className="h-full w-full object-contain p-2"
-                          />
-                        </div>
-                      ) : (
-                        <div className="mb-4 flex h-40 items-center justify-center rounded-lg bg-gray-700 text-gray-300">
-                          Sin imagen
-                        </div>
-                      )}
-
-                      <h3 className="text-lg font-semibold">
-                        {item.product?.product_name || "Producto"}
-                      </h3>
-
-                      <p className="mt-1 text-xs font-semibold uppercase text-emerald-500">
-                        {item.product?.category_name ?? "Sin categoria"}
-                      </p>
-
-                      <p className="mt-2 text-sm text-gray-300">
-                        {item.product?.description || "Sin descripcion"}
-                      </p>
-
-                      <div className="mt-3 space-y-1 text-sm text-muted">
-                        <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
-                        <p>Stock: {item.stock}</p>
-                      </div>
-
-                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                        <input
-                          type="number"
-                          min="1"
-                          max={item.stock}
-                          value={quantityById[item.id] ?? 1}
-                          onChange={(e) =>
-                            setQuantityById((prev) => ({
-                              ...prev,
-                              [item.id]: Number(e.target.value),
-                            }))
-                          }
-                          className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
-                        />
-
-                        <button
-                          onClick={() => handleAddCatalogItem(item)}
-                          className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 font-semibold hover:bg-emerald-700"
-                        >
-                          Agregar
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {results.length > 0 && (
-          <div className="info-box">
-            Se encontraron{" "}
-            <span className="font-semibold text-[var(--on-surface)]">
-              {results.length}
-            </span>{" "}
-            productos cerca de tu ubicacion.
-          </div>
-        )}
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {results.map((item) => (
-            <article
-              key={item.store_product_id}
-              className="rounded-2xl app-card p-5 shadow-lg"
-            >
-              {item.image_url ? (
-                <div className="mb-4 flex h-48 w-full items-center justify-center overflow-hidden rounded-lg bg-[#eef2f7]">
-                  <Image
-                    src={item.image_url}
-                    alt={item.product_name}
-                    width={400}
-                    height={220}
-                    className="h-full w-full object-contain p-2"
-                  />
-                </div>
-              ) : (
-                <div className="mb-4 flex h-48 items-center justify-center rounded-lg app-card-soft text-gray-300">
-                  Sin imagen
-                </div>
-              )}
-
-              <h2 className="section-title text-xl">{item.product_name}</h2>
-              <p className="mt-2 text-sm text-muted">
-                {item.product_description || "Sin descripcion"}
-              </p>
-
-              <div className="mt-3 space-y-1 text-sm text-muted">
-                <p>Tienda: {item.store_name}</p>
-                <p>Direccion: {item.address_text}</p>
-                <p>Categoria: {item.category_name ?? "Sin categoria"}</p>
-                <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
-                <p>Stock: {item.stock}</p>
-                <p>Distancia: {formatDistance(item.distance_meters)}</p>
-                <p>Horario: {formatOpeningHours(item.opening_hours)}</p>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="number"
-                  min="1"
-                  max={item.stock}
-                  value={quantityById[item.store_product_id] ?? 1}
-                  onChange={(e) =>
-                    setQuantityById((prev) => ({
-                      ...prev,
-                      [item.store_product_id]: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full rounded-2xl bg-[#eef2f7] px-3 py-2 text-[var(--on-surface)] outline-none sm:w-24"
-                />
-
-                <button
-                  onClick={() => handleAddSearchResult(item)}
-                  className="btn-primary flex-1 px-4 py-2"
-                >
-                  Agregar a mi reserva
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+          )}
+        </aside>
       </div>
     </main>
   );
