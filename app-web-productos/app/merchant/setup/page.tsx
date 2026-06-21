@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import {
   normalizeOpeningHours,
-  STORE_DAYS,
   type StoreOpeningHours,
   validateOpeningHours,
 } from "../../../lib/store-hours";
@@ -20,6 +19,7 @@ import {
 } from "../../../lib/auth/profile";
 import Notice from "../../../components/notice";
 import PageLoading from "../../../components/page-loading";
+import StoreHoursEditor from "../../../components/store-hours-editor";
 
 const StoreLocationPicker = dynamic(
   () => import("../../../components/store-location-picker"),
@@ -214,19 +214,6 @@ export default function MerchantSetupPage() {
       .getPublicUrl(filePath);
 
     return data.publicUrl;
-  }
-
-  function updateOpeningDay(
-    dayKey: string,
-    updates: Partial<StoreOpeningHours[string]>
-  ) {
-    setOpeningHours((prev) => ({
-      ...prev,
-      [dayKey]: {
-        ...prev[dayKey],
-        ...updates,
-      },
-    }));
   }
 
   useEffect(() => {
@@ -870,67 +857,10 @@ export default function MerchantSetupPage() {
             </div>
           </section>
 
-          <section className="app-card-soft p-4 sm:p-5">
-            <h2 className="section-title mb-4 text-xl">
-              Horario de atencion
-            </h2>
-
-            <div className="space-y-3">
-              {STORE_DAYS.map((day) => {
-                const dayHours = openingHours[day.key];
-
-                return (
-                  <div
-                    key={day.key}
-                    className="grid gap-3 rounded-2xl bg-white/60 p-3 sm:p-4 md:grid-cols-[120px_120px_1fr_1fr]"
-                  >
-                    <div className="font-semibold text-[var(--on-surface)]">
-                      {day.label}
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm text-muted">
-                      <input
-                        type="checkbox"
-                        checked={dayHours.closed}
-                        onChange={(e) =>
-                          updateOpeningDay(day.key, {
-                            closed: e.target.checked,
-                          })
-                        }
-                      />
-                      Cerrado
-                    </label>
-
-                    <div>
-                      <label className="mb-1 block small-label">Apertura</label>
-                      <input
-                        type="time"
-                        value={dayHours.open}
-                        disabled={dayHours.closed}
-                        onChange={(e) =>
-                          updateOpeningDay(day.key, { open: e.target.value })
-                        }
-                        className="app-input disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block small-label">Cierre</label>
-                      <input
-                        type="time"
-                        value={dayHours.close}
-                        disabled={dayHours.closed}
-                        onChange={(e) =>
-                          updateOpeningDay(day.key, { close: e.target.value })
-                        }
-                        className="app-input disabled:opacity-50"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          <StoreHoursEditor
+            value={openingHours}
+            onChange={setOpeningHours}
+          />
 
           <button
             type="submit"

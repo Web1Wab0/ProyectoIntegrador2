@@ -2,12 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Plus, ShoppingBasket, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  MapPin,
+  Plus,
+  ShoppingBasket,
+  Trash2,
+} from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import {
-  formatOpeningHours,
   getAvailablePickupSlots,
   getOpeningDayForDate,
   getTodayDateInput,
@@ -15,6 +21,8 @@ import {
   type StoreOpeningHours,
 } from "../../../lib/store-hours";
 import Notice from "../../../components/notice";
+import PickupTimePicker from "../../../components/pickup-time-picker";
+import StoreHoursDisplay from "../../../components/store-hours-display";
 
 const UNCATEGORIZED_ID = "uncategorized";
 
@@ -652,14 +660,25 @@ export default function StorePage() {
               <p className="mt-3 max-w-3xl text-muted">
                 {store.description || "Tienda disponible cerca de ti."}
               </p>
-              <div className="mt-4 space-y-1 text-sm text-muted">
-                <p>{store.address_text}</p>
-                <p>
-                  {[store.district, store.city, store.country]
-                    .filter(Boolean)
-                    .join(", ")}
-                </p>
-                <p>Horario: {formatOpeningHours(store.opening_hours)}</p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-high)] p-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)]">
+                    <MapPin size={18} />
+                  </div>
+                  <div className="min-w-0 text-sm">
+                    <p className="font-semibold text-[var(--on-surface)]">
+                      Ubicación
+                    </p>
+                    <p className="mt-1 text-muted">{store.address_text}</p>
+                    <p className="text-muted">
+                      {[store.district, store.city, store.country]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  </div>
+                </div>
+
+                <StoreHoursDisplay hours={store.opening_hours} />
               </div>
             </div>
 
@@ -859,46 +878,29 @@ export default function StorePage() {
 
               <div className="mt-5 grid gap-3">
                 <div>
-                  <label className="mb-2 block text-sm font-semibold">
-                    Fecha de recojo
-                  </label>
-                  <input
-                    type="date"
-                    value={pickupDate}
-                    min={getTodayDateInput()}
-                    onChange={(e) => setPickupDate(e.target.value)}
-                    className="app-input"
-                  />
+                  <div className="mb-2 flex items-center gap-2">
+                    <CalendarDays size={17} className="text-[var(--primary)]" />
+                    <label className="text-sm font-semibold">
+                      Fecha de recojo
+                    </label>
+                  </div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
+                    <input
+                      type="date"
+                      value={pickupDate}
+                      min={getTodayDateInput()}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      className="app-input border-0 bg-white"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold">
-                    Hora disponible
-                  </label>
-                  <select
-                    value={pickupTime}
-                    onChange={(e) => setPickupTime(e.target.value)}
-                    disabled={pickupSlots.length === 0}
-                    className="app-input disabled:opacity-60"
-                  >
-                    <option value="">
-                      {pickupSlots.length === 0
-                        ? "Sin horarios disponibles"
-                        : "Selecciona una hora"}
-                    </option>
-                    {pickupSlots.map((slot) => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedPickupDay?.closed || pickupSlots.length === 0 ? (
-                    <p className="mt-2 text-xs text-muted">
-                      La tienda no atiende en la fecha seleccionada o ya no hay
-                      horas futuras disponibles.
-                    </p>
-                  ) : null}
-                </div>
+                <PickupTimePicker
+                  slots={pickupSlots}
+                  value={pickupTime}
+                  onChange={setPickupTime}
+                  isClosed={selectedPickupDay?.closed === true}
+                />
 
                 <div>
                   <label className="mb-2 block text-sm font-semibold">

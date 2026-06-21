@@ -7,11 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
 import {
-  formatOpeningHours,
   normalizeOpeningHours,
   type StoreOpeningHours,
 } from "../lib/store-hours";
 import Notice from "../components/notice";
+import StoreHoursDisplay from "../components/store-hours-display";
 
 const SearchMap = dynamic(() => import("../components/search-map"), {
   ssr: false,
@@ -791,9 +791,11 @@ export default function SearchPage() {
                     {store.description || "Tienda disponible cerca de ti."}
                   </p>
 
-                  <p className="mt-2 text-xs text-muted">
-                    Horario: {formatOpeningHours(store.opening_hours)}
-                  </p>
+                  <StoreHoursDisplay
+                    hours={store.opening_hours}
+                    compact
+                    className="mt-3"
+                  />
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     {store.categories.slice(0, 3).map((category) => (

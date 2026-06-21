@@ -31,6 +31,15 @@ export type PickupSlot = {
   label: string;
 };
 
+export type StoreOpenStatus = {
+  isOpen: boolean;
+  dayKey: string;
+  label: string;
+  detail: string;
+};
+
+const LIMA_TIME_ZONE = "America/Lima";
+
 function cloneDefaultOpeningHours() {
   return Object.fromEntries(
     Object.entries(DEFAULT_OPENING_HOURS).map(([key, value]) => [
@@ -103,23 +112,65 @@ export function validateOpeningHours(hours: StoreOpeningHours) {
 }
 
 export function getTodayDateInput(now = new Date()) {
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const day = now.getDate().toString().padStart(2, "0");
+  const { year, month, day } = getLimaDateParts(now);
   return `${year}-${month}-${day}`;
+}
+
+function getLimaDateParts(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: LIMA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    year: values.year,
+    month: values.month,
+    day: values.day,
+    hour: values.hour,
+    minute: values.minute,
+  };
+}
+
+function getDayKeyForDate(dateValue: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) return null;
+
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  );
+
+  if (Number.isNaN(date.getTime())) return null;
+  return String(date.getUTCDay());
+}
+
+function addDays(dateValue: string, days: number) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) return "";
+
+  const date = new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days)
+  );
+
+  return date.toISOString().slice(0, 10);
+}
+
+export function getCurrentLimaDayKey(now = new Date()) {
+  const parts = getLimaDateParts(now);
+  return getDayKeyForDate(`${parts.year}-${parts.month}-${parts.day}`) ?? "0";
 }
 
 export function getOpeningDayForDate(
   dateValue: string,
   hours: StoreOpeningHours
 ) {
-  const date = new Date(`${dateValue}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return hours[String(date.getDay())] ?? null;
+  const dayKey = getDayKeyForDate(dateValue);
+  return dayKey ? hours[dayKey] ?? null : null;
 }
 
 export function getAvailablePickupSlots(
@@ -145,10 +196,16 @@ export function getAvailablePickupSlots(
     minutes += intervalMinutes
   ) {
     const time = minutesToTime(minutes);
-    const slotDate = new Date(`${dateValue}T${time}:00`);
+    const today = getTodayDateInput(now);
 
-    if (Number.isNaN(slotDate.getTime()) || slotDate <= now) {
-      continue;
+    if (dateValue < today) continue;
+
+    if (dateValue === today) {
+      const limaParts = getLimaDateParts(now);
+      const currentMinutes =
+        Number(limaParts.hour) * 60 + Number(limaParts.minute);
+
+      if (minutes <= currentMinutes) continue;
     }
 
     slots.push({
@@ -158,6 +215,71 @@ export function getAvailablePickupSlots(
   }
 
   return slots;
+}
+
+export function getStoreOpenStatus(
+  hours: StoreOpeningHours,
+  now = new Date()
+): StoreOpenStatus {
+  const limaParts = getLimaDateParts(now);
+  const today = `${limaParts.year}-${limaParts.month}-${limaParts.day}`;
+  const dayKey = getDayKeyForDate(today) ?? "0";
+  const dayHours = hours[dayKey];
+  const currentMinutes =
+    Number(limaParts.hour) * 60 + Number(limaParts.minute);
+
+  if (
+    dayHours &&
+    !dayHours.closed &&
+    currentMinutes >= timeToMinutes(dayHours.open) &&
+    currentMinutes < timeToMinutes(dayHours.close)
+  ) {
+    return {
+      isOpen: true,
+      dayKey,
+      label: "Abierto ahora",
+      detail: `Hasta las ${dayHours.close}`,
+    };
+  }
+
+  if (
+    dayHours &&
+    !dayHours.closed &&
+    currentMinutes < timeToMinutes(dayHours.open)
+  ) {
+    return {
+      isOpen: false,
+      dayKey,
+      label: "Cerrado ahora",
+      detail: `Abre hoy a las ${dayHours.open}`,
+    };
+  }
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const nextDate = addDays(today, offset);
+    const nextDayKey = getDayKeyForDate(nextDate);
+    if (!nextDayKey) continue;
+
+    const nextHours = hours[nextDayKey];
+    if (!nextHours || nextHours.closed) continue;
+
+    const day = STORE_DAYS.find((item) => item.key === nextDayKey);
+    const when = offset === 1 ? "mañana" : `el ${day?.label.toLowerCase()}`;
+
+    return {
+      isOpen: false,
+      dayKey,
+      label: "Cerrado ahora",
+      detail: `Abre ${when} a las ${nextHours.open}`,
+    };
+  }
+
+  return {
+    isOpen: false,
+    dayKey,
+    label: "Cerrado",
+    detail: "Sin próxima apertura registrada",
+  };
 }
 
 export function formatOpeningHours(hours: StoreOpeningHours) {
