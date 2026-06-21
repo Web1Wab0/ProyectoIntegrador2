@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft, Plus, ShoppingBasket, Trash2 } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
@@ -13,7 +14,6 @@ import {
   normalizeOpeningHours,
   type StoreOpeningHours,
 } from "../../../lib/store-hours";
-import AuthAccessMenu from "../../../components/auth-access-menu";
 import Notice from "../../../components/notice";
 
 const UNCATEGORIZED_ID = "uncategorized";
@@ -584,8 +584,15 @@ export default function StorePage() {
 
   if (loading) {
     return (
-      <main className="app-page flex items-center justify-center">
-        Cargando tienda...
+      <main className="app-page">
+        <div className="mx-auto max-w-7xl space-y-5">
+          <div className="skeleton h-8 w-40 rounded-lg" />
+          <div className="skeleton h-[360px] rounded-xl" />
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="skeleton h-72 rounded-xl" />
+            <div className="skeleton h-72 rounded-xl" />
+          </div>
+        </div>
       </main>
     );
   }
@@ -606,11 +613,11 @@ export default function StorePage() {
   return (
     <main className="min-h-screen bg-white text-[var(--on-surface)]">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/" className="link-primary">
+        <div className="mb-5 flex items-center">
+          <Link href="/" className="btn-soft">
+            <ArrowLeft size={18} />
             Volver al mapa
           </Link>
-          <AuthAccessMenu />
         </div>
 
         {notice && (
@@ -621,7 +628,7 @@ export default function StorePage() {
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
           <div>
-            <div className="relative h-[260px] overflow-hidden rounded-3xl bg-[#eef1f4] sm:h-[380px]">
+            <div className="relative h-[260px] overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4] sm:h-[380px]">
               {store.image_url ? (
                 <Image
                   src={store.image_url}
@@ -673,7 +680,7 @@ export default function StorePage() {
                     onClick={() => setActiveCategoryId("all")}
                     className={
                       activeCategoryId === "all"
-                        ? "shrink-0 rounded-full bg-[#222222] px-4 py-2 text-sm font-semibold text-white"
+                        ? "chip-selected shrink-0 px-4 py-2 text-sm"
                         : "shrink-0 rounded-full border border-[#d1d5db] px-4 py-2 text-sm font-semibold"
                     }
                   >
@@ -690,7 +697,7 @@ export default function StorePage() {
                         onClick={() => setActiveCategoryId(key)}
                         className={
                           activeCategoryId === key
-                            ? "shrink-0 rounded-full bg-[#222222] px-4 py-2 text-sm font-semibold text-white"
+                            ? "chip-selected shrink-0 px-4 py-2 text-sm"
                             : "shrink-0 rounded-full border border-[#d1d5db] px-4 py-2 text-sm font-semibold"
                         }
                       >
@@ -714,10 +721,10 @@ export default function StorePage() {
                       <article
                         key={item.id}
                         ref={highlighted ? highlightedRef : null}
-                        className={`rounded-3xl border p-4 transition ${
+                        className={`rounded-xl border bg-white p-4 transition ${
                           highlighted
-                            ? "border-[#ff385c] shadow-lg"
-                            : "border-[#e5e7eb]"
+                            ? "border-[var(--primary)] shadow-[0_10px_30px_rgba(121,0,243,0.13)]"
+                            : "border-[var(--border)] hover:shadow-md"
                         }`}
                       >
                         <div className="relative flex h-44 items-center justify-center overflow-hidden rounded-2xl bg-[#eef1f4]">
@@ -739,7 +746,7 @@ export default function StorePage() {
                         <h3 className="mt-4 text-lg font-semibold">
                           {item.product?.product_name ?? "Producto"}
                         </h3>
-                        <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#ff385c]">
+                        <p className="mt-1 text-xs font-semibold uppercase text-[var(--primary)]">
                           {item.product?.category_name ?? "Sin categoria"}
                         </p>
                         <p className="mt-2 line-clamp-2 text-sm text-muted">
@@ -769,6 +776,7 @@ export default function StorePage() {
                             onClick={() => handleAddCatalogItem(item)}
                             className="btn-primary flex-1"
                           >
+                            <Plus size={18} />
                             Agregar
                           </button>
                         </div>
@@ -781,8 +789,11 @@ export default function StorePage() {
           </div>
 
           <aside className="lg:sticky lg:top-24">
-            <div className="rounded-3xl border border-[#e5e7eb] bg-white p-5 shadow-xl">
-              <h2 className="text-xl font-bold">Tu reserva</h2>
+            <div className="rounded-xl border border-[var(--border)] bg-white p-5 shadow-[0_14px_36px_rgba(44,47,48,0.10)]">
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                <ShoppingBasket size={21} className="text-[var(--primary)]" />
+                Tu reserva
+              </h2>
               <p className="mt-1 text-sm text-muted">{store.store_name}</p>
 
               {cartItems.length === 0 ? (
@@ -835,9 +846,10 @@ export default function StorePage() {
                         <button
                           type="button"
                           onClick={() => removeCartItem(item.store_product_id)}
-                          className="rounded-2xl px-3 text-sm font-semibold text-[#ff385c] hover:bg-white"
+                          className="icon-button text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
+                          aria-label={`Quitar ${item.product_name}`}
                         >
-                          Quitar
+                          <Trash2 size={18} />
                         </button>
                       </div>
                     </div>

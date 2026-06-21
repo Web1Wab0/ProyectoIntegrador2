@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PasswordField from "../../../components/password-field";
+import Notice from "../../../components/notice";
 import { getDefaultPathForRole, getSafeInternalPath } from "../../../lib/auth/redirect";
 import { readProfileWithFallback } from "../../../lib/auth/profile";
 import { getAuthRedirectUrl } from "../../../lib/auth/site-url";
@@ -157,7 +158,7 @@ function SignInForm() {
           </button>
         </form>
 
-        {message && <p className="info-box mt-4">{message}</p>}
+        {message && <Notice type="error" message={message} />}
 
         <p className="mt-6 text-sm text-muted">
           No tienes cuenta?{" "}

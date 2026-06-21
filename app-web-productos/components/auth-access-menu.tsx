@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CircleUserRound, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
@@ -142,17 +143,20 @@ export default function AuthAccessMenu() {
     <div className="relative max-w-full">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 sm:px-5 sm:text-base"
+        className="flex h-10 items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 sm:px-4"
         style={{
           background: "linear-gradient(135deg, #7900f3, #b68aff)",
         }}
       >
-        {isLoggedIn ? "Mi cuenta" : "Acceso"}
+        <CircleUserRound size={18} />
+        <span className="hidden min-[360px]:inline">
+          {isLoggedIn ? "Mi cuenta" : "Acceso"}
+        </span>
       </button>
 
       {open && (
         <div
-          className="absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-3xl p-2 shadow-xl sm:w-72"
+          className="absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-xl border border-[var(--border)] p-2 shadow-xl sm:w-72"
           style={{
             background: "#ffffff",
             color: "#2c2f30",
@@ -269,9 +273,10 @@ export default function AuthAccessMenu() {
                 type="button"
                 onClick={handleSignOut}
                 disabled={signingOut}
-                className="block w-full rounded-2xl px-4 py-3 text-left font-medium transition hover:bg-[rgba(220,38,38,0.08)]"
+                className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left font-medium transition hover:bg-[rgba(220,38,38,0.08)]"
                 style={{ color: "#dc2626" }}
               >
+                <LogOut size={17} />
                 {signingOut ? "Cerrando..." : "Cerrar sesión"}
               </button>
             </>

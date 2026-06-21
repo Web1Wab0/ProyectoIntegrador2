@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PasswordField from "../../../components/password-field";
+import Notice from "../../../components/notice";
 import { getPasswordHelpMessage, isStrongPassword } from "../../../lib/auth/password";
 import { buildFullName } from "../../../lib/auth/profile";
 import { getAuthRedirectUrl } from "../../../lib/auth/site-url";
@@ -298,7 +299,17 @@ function SignUpForm() {
               </button>
             </form>
 
-            {message && <p className="info-box mt-4 text-sm">{message}</p>}
+            {message && (
+              <Notice
+                type={
+                  message.toLowerCase().includes("correctamente") ||
+                  message.toLowerCase().includes("exitoso")
+                    ? "success"
+                    : "error"
+                }
+                message={message}
+              />
+            )}
 
             <p className="mt-6 text-sm text-muted">
               Ya tienes cuenta?{" "}

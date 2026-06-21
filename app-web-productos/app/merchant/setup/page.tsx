@@ -19,6 +19,7 @@ import {
   updateProfileWithFallback,
 } from "../../../lib/auth/profile";
 import Notice from "../../../components/notice";
+import PageLoading from "../../../components/page-loading";
 
 const StoreLocationPicker = dynamic(
   () => import("../../../components/store-location-picker"),
@@ -637,11 +638,7 @@ export default function MerchantSetupPage() {
   }
 
   if (loading) {
-    return (
-      <main className="app-page flex items-center justify-center">
-        Cargando datos del local...
-      </main>
-    );
+    return <PageLoading label="Cargando configuración de la tienda" />;
   }
 
   return (

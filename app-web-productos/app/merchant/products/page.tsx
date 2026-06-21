@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import Notice from "../../../components/notice";
+import PageLoading from "../../../components/page-loading";
 
 type Category = {
   id: string;
@@ -410,11 +412,7 @@ export default function MerchantProductsPage() {
   }
 
   if (loading) {
-    return (
-      <main className="app-page flex items-center justify-center">
-        Cargando productos...
-      </main>
-    );
+    return <PageLoading label="Cargando productos" />;
   }
 
   return (
@@ -432,6 +430,7 @@ export default function MerchantProductsPage() {
             </div>
 
             <Link href="/dashboard" className="btn-soft px-4 py-2 text-sm">
+              <ArrowLeft size={17} />
               Volver
             </Link>
           </div>
@@ -542,6 +541,7 @@ export default function MerchantProductsPage() {
                 disabled={saving}
                 className="btn-primary flex-1 disabled:opacity-60"
               >
+                {editingStoreProductId ? <Save size={18} /> : <Plus size={18} />}
                 {saving
                   ? "Guardando..."
                   : editingStoreProductId
@@ -551,6 +551,7 @@ export default function MerchantProductsPage() {
 
               {editingStoreProductId && (
                 <button type="button" onClick={resetForm} className="btn-soft">
+                  <X size={18} />
                   Cancelar
                 </button>
               )}
@@ -570,7 +571,7 @@ export default function MerchantProductsPage() {
               {products.map((item) => (
                 <article key={item.id} className="app-card-soft p-4 sm:p-5">
                   {item.image_url ? (
-                    <div className="mb-4 flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#eef2f7]">
+                    <div className="mb-4 flex h-44 w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[#eef2f7]">
                       <Image
                         src={item.image_url}
                         alt={item.product?.product_name ?? "Producto"}
@@ -605,6 +606,7 @@ export default function MerchantProductsPage() {
                       onClick={() => handleEdit(item)}
                       className="btn-secondary"
                     >
+                      <Pencil size={17} />
                       Editar
                     </button>
 
@@ -612,6 +614,7 @@ export default function MerchantProductsPage() {
                       onClick={() => handleDelete(item.id)}
                       className="btn-danger"
                     >
+                      <Trash2 size={17} />
                       Eliminar
                     </button>
                   </div>

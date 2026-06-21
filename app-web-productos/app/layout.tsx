@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppHeader from "../components/app-header";
+import AppProviders from "../components/app-providers";
 
 export const metadata: Metadata = {
   title: "AhorraPe",
@@ -14,9 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" data-scroll-behavior="smooth">
-      <body className="bg-gray-950 text-white">
-        <AppHeader />
-        <main className="pt-16">{children}</main>
+      <body>
+        <AppProviders>
+          <AppHeader />
+          <main className="pt-16">{children}</main>
+        </AppProviders>
       </body>
     </html>
   );

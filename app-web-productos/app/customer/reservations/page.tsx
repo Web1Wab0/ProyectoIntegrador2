@@ -1,9 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft, CalendarClock, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import Notice from "../../../components/notice";
+import ReservationStatus from "../../../components/reservation-status";
+import PageLoading from "../../../components/page-loading";
 
 type ReservationItem = {
   id: string;
@@ -107,6 +111,24 @@ export default function CustomerReservationsPage() {
   const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [highlightedReservationId, setHighlightedReservationId] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setHighlightedReservationId(
+        new URLSearchParams(window.location.search).get("reservation") ?? ""
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (loading || !highlightedReservationId) return;
+    document
+      .getElementById(`reservation-${highlightedReservationId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedReservationId, loading]);
 
   useEffect(() => {
     let mounted = true;
@@ -268,11 +290,7 @@ export default function CustomerReservationsPage() {
   }
 
   if (loading) {
-    return (
-      <main className="app-page flex items-center justify-center">
-        Cargando reservas...
-      </main>
-    );
+    return <PageLoading label="Cargando reservas" />;
   }
 
   return (
@@ -287,6 +305,7 @@ export default function CustomerReservationsPage() {
           </div>
 
           <Link href="/" className="btn-soft">
+            <ArrowLeft size={18} />
             Volver al inicio
           </Link>
         </div>
@@ -295,12 +314,24 @@ export default function CustomerReservationsPage() {
 
         {reservations.length === 0 ? (
           <div className="app-card mt-4 p-4 shadow-lg sm:p-6">
-            No tienes reservas todavía.
+            <CalendarClock className="mb-3 text-[var(--primary)]" />
+            <p className="font-semibold">No tienes reservas todavía.</p>
+            <p className="mt-1 text-sm text-muted">
+              Explora tiendas cercanas y agrega productos para crear la primera.
+            </p>
           </div>
         ) : (
           <div className="mt-4 space-y-4">
             {reservations.map((item) => (
-              <article key={item.id} className="app-card p-4 shadow-lg sm:p-6">
+              <article
+                id={`reservation-${item.id}`}
+                key={item.id}
+                className={`app-card p-4 transition sm:p-6 ${
+                  highlightedReservationId === item.id
+                    ? "border-[var(--primary)] shadow-[0_12px_34px_rgba(121,0,243,0.16)]"
+                    : ""
+                }`}
+              >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <h2 className="section-title text-xl">
@@ -311,25 +342,8 @@ export default function CustomerReservationsPage() {
                     </p>
                   </div>
 
-                  <div className="app-card-soft w-full rounded-2xl px-4 py-3 text-sm sm:w-auto">
-                    <p>
-                      Estado:{" "}
-                      <span
-                        className={`font-semibold ${
-                          item.status === "pending"
-                            ? "text-amber-600"
-                            : item.status === "confirmed"
-                            ? "text-sky-600"
-                            : item.status === "ready"
-                            ? "text-indigo-600"
-                            : item.status === "completed"
-                            ? "text-emerald-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </p>
+                  <div className="app-card-soft w-full px-4 py-3 text-sm sm:w-auto">
+                    <ReservationStatus status={item.status} />
                     <p className="mt-1 break-words text-[var(--on-surface)]">Código: {item.pickup_code}</p>
                   </div>
                 </div>
@@ -358,15 +372,31 @@ export default function CustomerReservationsPage() {
                   <h3 className="section-title mb-3 text-lg">Productos de la reserva</h3>
                   <div className="space-y-3">
                     {item.reservation_items.map((detail) => (
-                      <div key={detail.id} className="app-card-soft rounded-2xl p-4">
-                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                          <div className="min-w-0">
+                      <div key={detail.id} className="app-card-soft p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+                              {detail.store_products?.image_url ? (
+                                <Image
+                                  src={detail.store_products.image_url}
+                                  alt={
+                                    detail.store_products?.products
+                                      ?.product_name || "Producto"
+                                  }
+                                  fill
+                                  sizes="64px"
+                                  className="object-contain p-1.5"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0">
                             <p className="font-semibold text-[var(--on-surface)]">
                               {detail.store_products?.products?.product_name || "Producto"}
                             </p>
                             <p className="text-sm text-muted">
                               Marca: {detail.store_products?.products?.brand || "Sin marca"}
                             </p>
+                            </div>
                           </div>
 
                           <div className="text-sm text-muted">
@@ -402,6 +432,7 @@ export default function CustomerReservationsPage() {
 
                 {(item.status === "pending" || item.status === "confirmed") && (
                   <button onClick={() => openCancelModal(item.id)} className="btn-danger mt-4">
+                    <XCircle size={18} />
                     Cancelar reserva
                   </button>
                 )}

@@ -54,6 +54,8 @@ type Props = {
   selectedResultId?: string | null;
   onSelectStore?: (store: NearbyStore) => void;
   onSelectResult?: (result: SearchResult) => void;
+  onOpenStore?: (store: NearbyStore) => void;
+  onOpenResult?: (result: SearchResult) => void;
 };
 
 function svgUrl(svg: string) {
@@ -61,7 +63,7 @@ function svgUrl(svg: string) {
 }
 
 function createStoreIcon(selected: boolean) {
-  const fill = selected ? "#ff385c" : "#111827";
+  const fill = selected ? "#7900f3" : "#2c2f30";
   const stroke = selected ? "#ffffff" : "#ffffff";
   const size = selected ? 36 : 30;
 
@@ -93,9 +95,9 @@ function createUserIcon() {
 function createPriceIcon(price: number, selected: boolean) {
   const text = `S/ ${Number(price).toFixed(2)}`;
   const width = Math.max(72, text.length * 9 + 24);
-  const fill = selected ? "#111827" : "#ffffff";
+  const fill = selected ? "#7900f3" : "#ffffff";
   const textFill = selected ? "#ffffff" : "#111827";
-  const stroke = selected ? "#111827" : "#d1d5db";
+  const stroke = selected ? "#7900f3" : "#d1d5db";
 
   return {
     url: svgUrl(`
@@ -112,6 +114,47 @@ function createPriceIcon(price: number, selected: boolean) {
   };
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function createInfoWindowContent({
+  imageUrl,
+  eyebrow,
+  title,
+  detail,
+}: {
+  imageUrl: string | null;
+  eyebrow: string;
+  title: string;
+  detail: string;
+}) {
+  const image = imageUrl
+    ? `<img src="${escapeHtml(imageUrl)}" alt="" style="width:72px;height:72px;object-fit:contain;padding:5px;border-radius:9px;background:#f2f4f7" />`
+    : `<div style="width:72px;height:72px;border-radius:9px;background:#eef1f4;display:flex;align-items:center;justify-content:center;color:#7b8794;font-size:11px">Sin imagen</div>`;
+
+  return `
+    <div style="width:260px;padding:4px 2px 2px;font-family:Arial,Helvetica,sans-serif;color:#2c2f30">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        ${image}
+        <div style="min-width:0;flex:1">
+          <div style="font-size:11px;font-weight:700;color:#7900f3;text-transform:uppercase">${escapeHtml(eyebrow)}</div>
+          <div style="margin-top:4px;font-size:15px;font-weight:700;line-height:1.25">${escapeHtml(title)}</div>
+          <div style="margin-top:5px;font-size:12px;line-height:1.35;color:#5f6b76">${escapeHtml(detail)}</div>
+        </div>
+      </div>
+      <button id="ahorrape-map-open" type="button" style="margin-top:12px;width:100%;border:0;border-radius:9px;background:#7900f3;color:#fff;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer">
+        Ver tienda
+      </button>
+    </div>
+  `;
+}
+
 export default function SearchMap({
   userLat,
   userLng,
@@ -121,12 +164,16 @@ export default function SearchMap({
   selectedResultId = null,
   onSelectStore,
   onSelectResult,
+  onOpenStore,
+  onOpenResult,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [activeMarkerKey, setActiveMarkerKey] = useState<string | null>(null);
 
   const visibleResults = useMemo(() => {
     if (results.length === 0) return [];
@@ -167,6 +214,14 @@ export default function SearchMap({
               stylers: [{ visibility: "off" }],
             },
           ],
+        });
+        infoWindowRef.current = new google.maps.InfoWindow();
+        mapRef.current.addListener("click", () => {
+          infoWindowRef.current?.close();
+          setActiveMarkerKey(null);
+        });
+        infoWindowRef.current.addListener("closeclick", () => {
+          setActiveMarkerKey(null);
         });
         setReady(true);
       } catch (mapError) {
@@ -209,6 +264,7 @@ export default function SearchMap({
           lng: Number(result.longitude),
         };
         const selected = result.store_product_id === selectedResultId;
+        const markerKey = `product:${result.store_product_id}`;
         const marker = new google.maps.Marker({
           position,
           map,
@@ -218,7 +274,38 @@ export default function SearchMap({
           zIndex: selected ? 40 : 30,
         });
 
-        marker.addListener("click", () => onSelectResult?.(result));
+        marker.addListener("click", () => {
+          if (activeMarkerKey === markerKey) {
+            onOpenResult?.(result);
+            return;
+          }
+
+          setActiveMarkerKey(markerKey);
+          onSelectResult?.(result);
+        });
+
+        if (activeMarkerKey === markerKey && infoWindowRef.current) {
+          infoWindowRef.current.setContent(
+            createInfoWindowContent({
+              imageUrl: result.image_url,
+              eyebrow: `S/ ${Number(result.price).toFixed(2)}`,
+              title: result.product_name,
+              detail: `${result.store_name} · Stock ${result.stock}`,
+            })
+          );
+          infoWindowRef.current.open({ map, anchor: marker });
+          google.maps.event.addListenerOnce(
+            infoWindowRef.current,
+            "domready",
+            () => {
+              document
+                .getElementById("ahorrape-map-open")
+                ?.addEventListener("click", () => onOpenResult?.(result), {
+                  once: true,
+                });
+            }
+          );
+        }
         markersRef.current.push(marker);
         bounds.extend(position);
       });
@@ -229,6 +316,7 @@ export default function SearchMap({
           lng: Number(store.longitude),
         };
         const selected = store.store_id === selectedStoreId;
+        const markerKey = `store:${store.store_id}`;
         const marker = new google.maps.Marker({
           position,
           map,
@@ -238,7 +326,38 @@ export default function SearchMap({
           zIndex: selected ? 35 : 25,
         });
 
-        marker.addListener("click", () => onSelectStore?.(store));
+        marker.addListener("click", () => {
+          if (activeMarkerKey === markerKey) {
+            onOpenStore?.(store);
+            return;
+          }
+
+          setActiveMarkerKey(markerKey);
+          onSelectStore?.(store);
+        });
+
+        if (activeMarkerKey === markerKey && infoWindowRef.current) {
+          infoWindowRef.current.setContent(
+            createInfoWindowContent({
+              imageUrl: store.image_url,
+              eyebrow: "Tienda cercana",
+              title: store.store_name,
+              detail: `${store.address_text} · ${store.product_count} productos`,
+            })
+          );
+          infoWindowRef.current.open({ map, anchor: marker });
+          google.maps.event.addListenerOnce(
+            infoWindowRef.current,
+            "domready",
+            () => {
+              document
+                .getElementById("ahorrape-map-open")
+                ?.addEventListener("click", () => onOpenStore?.(store), {
+                  once: true,
+                });
+            }
+          );
+        }
         markersRef.current.push(marker);
         bounds.extend(position);
       });
@@ -251,6 +370,9 @@ export default function SearchMap({
       map.setZoom(14);
     }
   }, [
+    activeMarkerKey,
+    onOpenResult,
+    onOpenStore,
     onSelectResult,
     onSelectStore,
     ready,
@@ -263,7 +385,7 @@ export default function SearchMap({
   ]);
 
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-3xl bg-[#eef1f4]">
+    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4]">
       {error ? (
         <div className="flex h-full min-h-[320px] items-center justify-center p-6 text-center text-sm text-muted">
           {error}

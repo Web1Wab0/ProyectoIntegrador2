@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { LocateFixed, Search, Store, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
@@ -10,7 +11,6 @@ import {
   normalizeOpeningHours,
   type StoreOpeningHours,
 } from "../lib/store-hours";
-import AuthAccessMenu from "../components/auth-access-menu";
 import Notice from "../components/notice";
 
 const SearchMap = dynamic(() => import("../components/search-map"), {
@@ -209,14 +209,16 @@ function StoreImage({
   src,
   alt,
   className = "h-56",
+  fit = "cover",
 }: {
   src: string | null;
   alt: string;
   className?: string;
+  fit?: "cover" | "contain";
 }) {
   return (
     <div
-      className={`${className} relative flex w-full items-center justify-center overflow-hidden rounded-3xl bg-[#eef1f4]`}
+      className={`${className} relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4]`}
     >
       {src ? (
         <Image
@@ -224,7 +226,7 @@ function StoreImage({
           alt={alt}
           fill
           sizes="(max-width: 768px) 100vw, 420px"
-          className="object-cover"
+          className={fit === "contain" ? "object-contain p-3" : "object-cover"}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f7f7f7] to-[#e9edf2] text-sm font-semibold text-muted">
@@ -601,10 +603,6 @@ export default function SearchPage() {
     <main className="min-h-screen bg-white text-[var(--on-surface)]">
       <div className="border-b border-[#e5e7eb] bg-white">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
-          <div className="flex items-center justify-end">
-            <AuthAccessMenu />
-          </div>
-
           <div className="grid gap-4 lg:grid-cols-[1fr_220px] lg:items-end">
             <div className="min-w-0">
               <h1 className="page-title text-2xl sm:text-3xl">
@@ -621,6 +619,7 @@ export default function SearchPage() {
               disabled={loadingLocation}
               className="btn-soft justify-self-start border border-[#d1d5db] bg-white lg:justify-self-end"
             >
+              <LocateFixed size={18} />
               {loadingLocation
                 ? "Detectando ubicacion..."
                 : locationAttempted
@@ -631,20 +630,20 @@ export default function SearchPage() {
 
           <form
             onSubmit={handleSearch}
-            className="grid gap-3 rounded-full border border-[#d1d5db] bg-white p-2 shadow-sm md:grid-cols-[1fr_150px_120px_auto]"
+            className="grid gap-2 rounded-xl border border-[var(--border)] bg-white p-2 shadow-sm md:grid-cols-[1fr_150px_120px_auto]"
           >
             <input
               type="text"
               placeholder="Busca arroz, leche, gaseosa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="min-h-12 rounded-full px-4 text-sm outline-none"
+              className="min-h-12 rounded-lg px-4 text-sm outline-none focus:bg-[var(--surface-high)]"
             />
 
             <select
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              className="min-h-12 rounded-full bg-[#f7f7f7] px-4 text-sm outline-none"
+              className="min-h-12 rounded-lg bg-[#f7f7f7] px-4 text-sm outline-none"
             >
               <option value="1000">1 km</option>
               <option value="3000">3 km</option>
@@ -655,8 +654,9 @@ export default function SearchPage() {
             <button
               type="submit"
               disabled={searching}
-              className="min-h-12 rounded-full bg-[#ff385c] px-5 text-sm font-bold text-white transition hover:bg-[#e03150] disabled:opacity-60"
+              className="btn-primary min-h-12 disabled:opacity-60"
             >
+              <Search size={18} />
               {searching ? "Buscando" : "Buscar"}
             </button>
 
@@ -664,8 +664,9 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={clearSearch}
-                className="min-h-12 rounded-full px-4 text-sm font-semibold text-[#222222] transition hover:bg-[#f7f7f7]"
+                className="btn-soft min-h-12"
               >
+                <X size={18} />
                 Ver tiendas
               </button>
             )}
@@ -696,7 +697,7 @@ export default function SearchPage() {
           </div>
 
           {userLat === null || userLng === null ? (
-            <div className="rounded-3xl border border-[#e5e7eb] bg-[#f7f7f7] p-6 text-sm text-muted">
+            <div className="rounded-xl border border-[var(--border)] bg-[#f7f7f7] p-6 text-sm text-muted">
               Acepta el permiso de ubicacion para ver tiendas cercanas en el
               mapa.
             </div>
@@ -718,11 +719,12 @@ export default function SearchPage() {
                     src={item.image_url}
                     alt={item.product_name}
                     className="h-64"
+                    fit="contain"
                   />
 
                   <div className="mt-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-[#222222] group-hover:underline">
+                      <h3 className="truncate font-semibold text-[var(--on-surface)] group-hover:text-[var(--primary)]">
                         {item.product_name}
                       </h3>
                       <p className="mt-1 truncate text-sm text-muted">
@@ -744,14 +746,14 @@ export default function SearchPage() {
                     <span> · Stock {item.stock}</span>
                   </div>
 
-                  <p className="mt-2 font-semibold text-[#222222]">
+                  <p className="mt-2 font-semibold text-[var(--on-surface)]">
                     S/ {Number(item.price).toFixed(2)}
                   </p>
                 </article>
               ))}
             </div>
           ) : nearbyStores.length === 0 && !loadingStores ? (
-            <div className="rounded-3xl border border-[#e5e7eb] bg-[#f7f7f7] p-6 text-sm text-muted">
+            <div className="rounded-xl border border-[var(--border)] bg-[#f7f7f7] p-6 text-sm text-muted">
               No encontramos tiendas activas en este radio. Prueba ampliarlo o
               vuelve a intentar tu ubicacion.
             </div>
@@ -772,7 +774,7 @@ export default function SearchPage() {
 
                   <div className="mt-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-[#222222] group-hover:underline">
+                      <h3 className="truncate font-semibold text-[var(--on-surface)] group-hover:text-[var(--primary)]">
                         {store.store_name}
                       </h3>
                       <p className="mt-1 truncate text-sm text-muted">
@@ -797,7 +799,7 @@ export default function SearchPage() {
                     {store.categories.slice(0, 3).map((category) => (
                       <span
                         key={category.category_id ?? UNCATEGORIZED_ID}
-                        className="rounded-full bg-[#f7f7f7] px-3 py-1 text-xs font-medium text-[#222222]"
+                        className="rounded-full bg-[#f2ecff] px-3 py-1 text-xs font-medium text-[var(--primary)]"
                       >
                         {category.category_name}
                       </span>
@@ -823,14 +825,22 @@ export default function SearchPage() {
               stores={nearbyStores}
               selectedStoreId={selectedStoreId}
               selectedResultId={selectedResultId}
-              onSelectStore={(store) => router.push(storeHref(store.store_id))}
-              onSelectResult={(result) =>
+              onSelectStore={(store) => setSelectedStoreId(store.store_id)}
+              onSelectResult={(result) => {
+                setSelectedStoreId(result.store_id);
+                setSelectedResultId(result.store_product_id);
+              }}
+              onOpenStore={(store) => router.push(storeHref(store.store_id))}
+              onOpenResult={(result) =>
                 router.push(storeHref(result.store_id, result.store_product_id))
               }
             />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-3xl bg-[#f7f7f7] p-6 text-center text-sm text-muted">
-              El mapa aparecera cuando aceptes compartir tu ubicacion.
+            <div className="flex h-full items-center justify-center rounded-xl border border-[var(--border)] bg-[#f7f7f7] p-6 text-center text-sm text-muted">
+              <div>
+                <Store className="mx-auto mb-3 text-[var(--primary)]" />
+                El mapa aparecerá cuando aceptes compartir tu ubicación.
+              </div>
             </div>
           )}
         </aside>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Notice from "../../components/notice";
+import PageLoading from "../../components/page-loading";
 import PasswordField from "../../components/password-field";
 import {
   getPasswordHelpMessage,
@@ -266,11 +267,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <main className="app-page flex items-center justify-center">
-        Cargando perfil...
-      </main>
-    );
+    return <PageLoading label="Cargando perfil" />;
   }
 
   return (

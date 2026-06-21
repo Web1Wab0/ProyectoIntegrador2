@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadGoogleGeocoding, loadGoogleMaps } from "../lib/google-maps";
+import Notice from "./notice";
 
 type AddressSelection = {
   addressText?: string;
@@ -241,7 +242,16 @@ export default function StoreLocationPicker({
         </button>
       </div>
 
-      {message && <div className="info-box text-sm">{message}</div>}
+      {message && (
+        <Notice
+          type={
+            message.toLowerCase().includes("seleccionada")
+              ? "success"
+              : "warning"
+          }
+          message={message}
+        />
+      )}
 
       {results.length > 0 && (
         <div className="space-y-2">
