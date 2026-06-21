@@ -123,6 +123,26 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
+const lightMapStyles: google.maps.MapTypeStyle[] = [
+  {
+    featureType: "poi.business",
+    stylers: [{ visibility: "off" }],
+  },
+];
+
+const darkMapStyles: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#202124" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#202124" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#aeb4bf" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#4c515b" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#25272d" }] },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#34373e" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#c1c5cd" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#151c25" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#7f8b9a" }] },
+];
+
 function createInfoWindowContent({
   imageUrl,
   eyebrow,
@@ -208,12 +228,10 @@ export default function SearchMap({
           fullscreenControl: true,
           mapTypeControl: false,
           streetViewControl: false,
-          styles: [
-            {
-              featureType: "poi.business",
-              stylers: [{ visibility: "off" }],
-            },
-          ],
+          styles:
+            document.documentElement.dataset.theme === "dark"
+              ? darkMapStyles
+              : lightMapStyles,
         });
         infoWindowRef.current = new google.maps.InfoWindow();
         mapRef.current.addListener("click", () => {
@@ -236,6 +254,21 @@ export default function SearchMap({
       mounted = false;
     };
   }, [userLat, userLng]);
+
+  useEffect(() => {
+    function updateTheme(event?: Event) {
+      const customEvent = event as CustomEvent<{ theme?: string }> | undefined;
+      const dark =
+        customEvent?.detail?.theme === "dark" ||
+        document.documentElement.dataset.theme === "dark";
+      mapRef.current?.setOptions({
+        styles: dark ? darkMapStyles : lightMapStyles,
+      });
+    }
+
+    window.addEventListener("ahorrape-theme-change", updateTheme);
+    return () => window.removeEventListener("ahorrape-theme-change", updateTheme);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;

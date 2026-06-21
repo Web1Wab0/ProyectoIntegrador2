@@ -5,7 +5,10 @@ import NotificationCenter from "./notification-center";
 
 export default function AppHeader() {
   return (
-    <header className="fixed inset-x-0 top-0 z-[10000] border-b border-[var(--border)] bg-white/90 backdrop-blur-xl">
+    <header
+      className="fixed inset-x-0 top-0 z-[10000] border-b border-[var(--border)] backdrop-blur-xl"
+      style={{ background: "var(--header-bg)" }}
+    >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-10">
         <Link
           href="/"

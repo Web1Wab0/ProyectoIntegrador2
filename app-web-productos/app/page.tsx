@@ -12,6 +12,8 @@ import {
 } from "../lib/store-hours";
 import Notice from "../components/notice";
 import StoreHoursDisplay from "../components/store-hours-display";
+import FavoriteButton from "../components/favorite-button";
+import RatingSummary from "../components/rating-summary";
 
 const SearchMap = dynamic(() => import("../components/search-map"), {
   ssr: false,
@@ -261,8 +263,57 @@ export default function SearchPage() {
   const [locationAttempted, setLocationAttempted] = useState(false);
   const [loadingStores, setLoadingStores] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [storeRatings, setStoreRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >({});
+  const [productRatings, setProductRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >({});
 
   const isSearchMode = results.length > 0;
+
+  useEffect(() => {
+    const storeIds = Array.from(
+      new Set([
+        ...nearbyStores.map((item) => item.store_id),
+        ...results.map((item) => item.store_id),
+      ])
+    );
+    const productIds = results.map((item) => item.store_product_id);
+    if (!storeIds.length && !productIds.length) return;
+
+    void (async () => {
+      const storeResponse = storeIds.length
+        ? await supabase
+            .from("store_review_summaries")
+            .select("store_id, rating_average, review_count")
+            .in("store_id", storeIds)
+        : { data: [] };
+      const productResponse = productIds.length
+        ? await supabase
+            .from("product_review_summaries")
+            .select("store_product_id, rating_average, review_count")
+            .in("store_product_id", productIds)
+        : { data: [] };
+
+      const nextStores: Record<string, { average: number; count: number }> = {};
+      (storeResponse.data ?? []).forEach((row) => {
+        nextStores[row.store_id] = {
+          average: Number(row.rating_average ?? 0),
+          count: Number(row.review_count ?? 0),
+        };
+      });
+      const nextProducts: Record<string, { average: number; count: number }> = {};
+      (productResponse.data ?? []).forEach((row) => {
+        nextProducts[row.store_product_id] = {
+          average: Number(row.rating_average ?? 0),
+          count: Number(row.review_count ?? 0),
+        };
+      });
+      setStoreRatings(nextStores);
+      setProductRatings(nextProducts);
+    })();
+  }, [nearbyStores, results, supabase]);
 
   const loadNearbyStoresFallback = useCallback(
     async (lat: number, lng: number, signal: AbortSignal) => {
@@ -710,7 +761,7 @@ export default function SearchPage() {
                     setSelectedResultId(item.store_product_id);
                     setSelectedStoreId(item.store_id);
                   }}
-                  className="group cursor-pointer"
+                  className="group relative cursor-pointer"
                   onClick={() =>
                     router.push(storeHref(item.store_id, item.store_product_id))
                   }
@@ -721,6 +772,12 @@ export default function SearchPage() {
                     className="h-64"
                     fit="contain"
                   />
+                  <FavoriteButton
+                    kind="product"
+                    id={item.store_product_id}
+                    storeId={item.store_id}
+                    className="absolute right-3 top-3 z-10"
+                  />
 
                   <div className="mt-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -730,6 +787,11 @@ export default function SearchPage() {
                       <p className="mt-1 truncate text-sm text-muted">
                         {item.store_name}
                       </p>
+                      <RatingSummary
+                        average={productRatings[item.store_product_id]?.average ?? 0}
+                        count={productRatings[item.store_product_id]?.count ?? 0}
+                        compact
+                      />
                     </div>
 
                     <span className="shrink-0 text-sm font-semibold">
@@ -764,12 +826,18 @@ export default function SearchPage() {
                   key={store.store_id}
                   onMouseEnter={() => setSelectedStoreId(store.store_id)}
                   onClick={() => router.push(storeHref(store.store_id))}
-                  className="group cursor-pointer"
+                  className="group relative cursor-pointer"
                 >
                   <StoreImage
                     src={store.image_url}
                     alt={store.store_name}
                     className="h-64"
+                  />
+                  <FavoriteButton
+                    kind="store"
+                    id={store.store_id}
+                    storeId={store.store_id}
+                    className="absolute right-3 top-3 z-10"
                   />
 
                   <div className="mt-3 flex items-start justify-between gap-3">
@@ -780,6 +848,11 @@ export default function SearchPage() {
                       <p className="mt-1 truncate text-sm text-muted">
                         {store.address_text}
                       </p>
+                      <RatingSummary
+                        average={storeRatings[store.store_id]?.average ?? 0}
+                        count={storeRatings[store.store_id]?.count ?? 0}
+                        compact
+                      />
                     </div>
 
                     <span className="shrink-0 text-sm font-semibold">

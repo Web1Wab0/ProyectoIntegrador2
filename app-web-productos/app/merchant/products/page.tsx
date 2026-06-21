@@ -12,6 +12,7 @@ import PageLoading from "../../../components/page-loading";
 type Category = {
   id: string;
   name: string;
+  is_age_restricted?: boolean;
 };
 
 type ProductInfo = {
@@ -28,6 +29,7 @@ type StoreProductRow = {
   stock: number;
   image_url: string | null;
   is_available: boolean;
+  low_stock_threshold: number;
   product: ProductInfo | null;
 };
 
@@ -90,36 +92,54 @@ export default function MerchantProductsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("3");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
 
   const loadStoreProducts = useCallback(
     async (currentStoreId: string) => {
-      const { data, error } = await supabase
-        .from("store_products")
-        .select(`
-          id,
-          price,
-          stock,
-          image_url,
-          is_available,
-          product:products!store_products_product_id_fkey (
-            id,
-            product_name,
-            description,
-            brand,
-            category_id
-          )
-        `)
-        .eq("store_id", currentStoreId)
-        .order("created_at", { ascending: false });
+      async function queryProducts(includeThreshold: boolean) {
+        const fields = includeThreshold
+          ? `
+            id, price, stock, image_url, is_available, low_stock_threshold,
+            product:products!store_products_product_id_fkey (
+              id, product_name, description, brand, category_id
+            )
+          `
+          : `
+            id, price, stock, image_url, is_available,
+            product:products!store_products_product_id_fkey (
+              id, product_name, description, brand, category_id
+            )
+          `;
+        return supabase
+          .from("store_products")
+          .select(fields)
+          .eq("store_id", currentStoreId)
+          .order("created_at", { ascending: false });
+      }
+
+      let { data, error } = await queryProducts(true);
+      if (error?.message.toLowerCase().includes("low_stock_threshold")) {
+        const fallback = await queryProducts(false);
+        data = fallback.data;
+        error = fallback.error;
+      }
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
-      setProducts((data ?? []).map(normalizeStoreProductRow));
+      setProducts(
+        (((data ?? []) as unknown) as RawStoreProductRow[]).map((row) =>
+          normalizeStoreProductRow({
+            ...row,
+            low_stock_threshold: Number(row.low_stock_threshold ?? 3),
+          })
+        )
+      );
     },
     [supabase]
   );
@@ -176,10 +196,25 @@ export default function MerchantProductsPage() {
 
     setStoreId(storeData.id);
 
-    const { data: categoriesData, error: categoriesError } = await supabase
+    const categoryResponse = await supabase
       .from("categories")
-      .select("id, name")
-      .order("name", { ascending: true });
+      .select("id, name, is_age_restricted")
+      .order("sort_order", { ascending: true });
+    let categoriesData: Category[] | null =
+      (categoryResponse.data as Category[] | null) ?? null;
+    let categoriesError = categoryResponse.error;
+
+    if (categoriesError?.message.toLowerCase().includes("is_age_restricted")) {
+      const fallback = await supabase
+        .from("categories")
+        .select("id, name")
+        .order("name", { ascending: true });
+      categoriesData = (fallback.data ?? []).map((row) => ({
+        ...row,
+        is_age_restricted: false,
+      }));
+      categoriesError = fallback.error;
+    }
 
     if (categoriesError) {
       setMessage(categoriesError.message);
@@ -209,6 +244,7 @@ export default function MerchantProductsPage() {
     setCategoryId("");
     setPrice("");
     setStock("");
+    setLowStockThreshold("3");
     setImageFile(null);
     setCurrentImageUrl("");
   }
@@ -278,6 +314,7 @@ export default function MerchantProductsPage() {
 
     const numericPrice = Number(price);
     const numericStock = Number(stock);
+    const numericLowStockThreshold = Number(lowStockThreshold);
 
     if (Number.isNaN(numericPrice) || numericPrice < 0) {
       setMessage("El precio no es válido.");
@@ -287,6 +324,16 @@ export default function MerchantProductsPage() {
 
     if (Number.isNaN(numericStock) || numericStock < 0) {
       setMessage("El stock no es válido.");
+      setSaving(false);
+      return;
+    }
+
+    if (
+      Number.isNaN(numericLowStockThreshold) ||
+      numericLowStockThreshold < 0 ||
+      numericLowStockThreshold > 9999
+    ) {
+      setMessage("El umbral de stock bajo debe estar entre 0 y 9999.");
       setSaving(false);
       return;
     }
@@ -318,6 +365,7 @@ export default function MerchantProductsPage() {
             stock: numericStock,
             image_url: uploadedImageUrl,
             is_available: numericStock > 0,
+            low_stock_threshold: numericLowStockThreshold,
           })
           .eq("id", editingStoreProductId);
 
@@ -356,6 +404,7 @@ export default function MerchantProductsPage() {
             stock: numericStock,
             image_url: uploadedImageUrl,
             is_available: numericStock > 0,
+            low_stock_threshold: numericLowStockThreshold,
           });
 
         if (storeProductInsertError) {
@@ -386,6 +435,7 @@ export default function MerchantProductsPage() {
     setCategoryId(item.product?.category_id ?? "");
     setPrice(String(item.price ?? ""));
     setStock(String(item.stock ?? ""));
+    setLowStockThreshold(String(item.low_stock_threshold ?? 3));
     setCurrentImageUrl(item.image_url ?? "");
     setImageFile(null);
     setMessage("");
@@ -526,6 +576,23 @@ export default function MerchantProductsPage() {
             </div>
 
             <div>
+              <label className="mb-2 block small-label">
+                Avisar cuando el stock llegue a
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="9999"
+                value={lowStockThreshold}
+                onChange={(e) => setLowStockThreshold(e.target.value)}
+                className="app-input"
+              />
+              <p className="mt-1 text-xs text-muted">
+                Recibirás una notificación al cruzar este umbral.
+              </p>
+            </div>
+
+            <div>
               <label className="mb-2 block small-label">Imagen</label>
               <input
                 type="file"
@@ -560,7 +627,18 @@ export default function MerchantProductsPage() {
         </section>
 
         <section className="app-card p-4 shadow-lg sm:p-6">
-          <h2 className="section-title text-xl sm:text-2xl">Productos registrados</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="section-title text-xl sm:text-2xl">Productos registrados</h2>
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={showLowStockOnly}
+                onChange={(event) => setShowLowStockOnly(event.target.checked)}
+                className="h-4 w-4 accent-[var(--primary)]"
+              />
+              Solo stock bajo
+            </label>
+          </div>
 
           {products.length === 0 ? (
             <div className="info-box mt-4">
@@ -568,7 +646,13 @@ export default function MerchantProductsPage() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {products.map((item) => (
+              {products
+                .filter(
+                  (item) =>
+                    !showLowStockOnly ||
+                    Number(item.stock) <= Number(item.low_stock_threshold)
+                )
+                .map((item) => (
                 <article key={item.id} className="app-card-soft p-4 sm:p-5">
                   {item.image_url ? (
                     <div className="mb-4 flex h-44 w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[#eef2f7]">
@@ -598,8 +682,15 @@ export default function MerchantProductsPage() {
                     <p>Marca: {item.product?.brand || "Sin marca"}</p>
                     <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
                     <p>Stock: {item.stock}</p>
+                    <p>Umbral de aviso: {item.low_stock_threshold}</p>
                     <p>Estado: {item.is_available ? "Disponible" : "No disponible"}</p>
                   </div>
+
+                  {Number(item.stock) <= Number(item.low_stock_threshold) && (
+                    <span className="status-badge mt-3 bg-amber-100 text-amber-800">
+                      Stock bajo
+                    </span>
+                  )}
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <button

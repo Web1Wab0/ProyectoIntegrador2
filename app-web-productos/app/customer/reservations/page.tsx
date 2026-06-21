@@ -8,6 +8,7 @@ import { createClient } from "../../../lib/supabase/client";
 import Notice from "../../../components/notice";
 import ReservationStatus from "../../../components/reservation-status";
 import PageLoading from "../../../components/page-loading";
+import ReservationReviewForm from "../../../components/reservation-review-form";
 
 type ReservationItem = {
   id: string;
@@ -15,6 +16,7 @@ type ReservationItem = {
   unit_price: number;
   subtotal: number;
   store_products: {
+    id: string;
     image_url: string | null;
     products: {
       product_name: string;
@@ -37,6 +39,7 @@ type ReservationRow = {
   customer_cancel_reason: string | null;
   notes: string | null;
   stores: {
+    id: string;
     store_name: string;
     address_text: string;
   } | null;
@@ -195,6 +198,7 @@ export default function CustomerReservationsPage() {
             customer_cancel_reason,
             notes,
             stores:store_id (
+              id,
               store_name,
               address_text
             ),
@@ -204,6 +208,7 @@ export default function CustomerReservationsPage() {
               unit_price,
               subtotal,
               store_products:store_product_id (
+                id,
                 image_url,
                 products:product_id (
                   product_name,
@@ -435,6 +440,29 @@ export default function CustomerReservationsPage() {
                     <XCircle size={18} />
                     Cancelar reserva
                   </button>
+                )}
+
+                {item.status === "completed" && item.stores && (
+                  <>
+                    <ReservationReviewForm
+                      reservationId={item.id}
+                      storeId={item.stores.id}
+                      products={item.reservation_items
+                        .filter((detail) => detail.store_products)
+                        .map((detail) => ({
+                          id: detail.store_products!.id,
+                          name:
+                            detail.store_products!.products?.product_name ||
+                            "Producto",
+                        }))}
+                    />
+                    <Link
+                      href={`/stores/${item.stores.id}?reorder=${item.id}`}
+                      className="btn-secondary mt-4"
+                    >
+                      Volver a pedir
+                    </Link>
+                  </>
                 )}
               </article>
             ))}

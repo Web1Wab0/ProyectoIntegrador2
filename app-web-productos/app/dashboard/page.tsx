@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Boxes, LogOut, MapPinned, ReceiptText } from "lucide-react";
+import { BarChart3, Boxes, LogOut, MapPinned, ReceiptText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
@@ -91,12 +91,23 @@ export default function DashboardPage() {
 
           <Link
             href="/merchant/reservations"
-            className="app-card-soft group p-4 transition hover:-translate-y-0.5 hover:border-[rgba(121,0,243,0.25)] hover:bg-white hover:shadow-md sm:p-6 md:col-span-2"
+            className="app-card-soft group p-4 transition hover:-translate-y-0.5 hover:border-[rgba(121,0,243,0.25)] hover:bg-white hover:shadow-md sm:p-6"
           >
             <ReceiptText className="mb-5 text-[var(--tertiary)]" />
             <h2 className="section-title text-xl">Reservas</h2>
             <p className="mt-2 text-muted">
               Ver, aprobar, marcar listo o cancelar reservas del local.
+            </p>
+          </Link>
+
+          <Link
+            href="/merchant/analytics"
+            className="app-card-soft group p-4 transition hover:-translate-y-0.5 hover:border-[rgba(121,0,243,0.25)] hover:bg-white hover:shadow-md sm:p-6"
+          >
+            <BarChart3 className="mb-5 text-[var(--primary)]" />
+            <h2 className="section-title text-xl">Analítica</h2>
+            <p className="mt-2 text-muted">
+              Revisa visitas, conversión, productos destacados y recojos.
             </p>
           </Link>
         </div>

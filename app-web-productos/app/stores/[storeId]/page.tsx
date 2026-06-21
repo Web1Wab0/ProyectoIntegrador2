@@ -23,6 +23,9 @@ import {
 import Notice from "../../../components/notice";
 import PickupTimePicker from "../../../components/pickup-time-picker";
 import StoreHoursDisplay from "../../../components/store-hours-display";
+import FavoriteButton from "../../../components/favorite-button";
+import RatingSummary from "../../../components/rating-summary";
+import { recordStoreEvent } from "../../../lib/analytics";
 
 const UNCATEGORIZED_ID = "uncategorized";
 
@@ -53,6 +56,7 @@ type StoreCatalogItem = {
     brand: string | null;
     category_id: string | null;
     category_name: string;
+    is_age_restricted: boolean;
   } | null;
 };
 
@@ -63,6 +67,7 @@ type CartItem = {
   quantity: number;
   image_url: string | null;
   stock: number;
+  is_age_restricted: boolean;
 };
 
 type MaybeArray<T> = T | T[] | null;
@@ -75,6 +80,7 @@ type RawStoreRow = Omit<StoreDetails, "opening_hours" | "image_url"> & {
 type StoreCatalogCategory = {
   id: string;
   name: string;
+  is_age_restricted?: boolean;
 };
 
 type RawStoreCatalogProduct = {
@@ -117,6 +123,7 @@ function normalizeStoreCatalogItem(
           brand: product.brand,
           category_id: category?.id ?? product.category_id ?? null,
           category_name: category?.name ?? "Sin categoria",
+          is_age_restricted: category?.is_age_restricted === true,
         }
       : null,
   };
@@ -171,6 +178,14 @@ export default function StorePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [storeRating, setStoreRating] = useState({ average: 0, count: 0 });
+  const [productRatings, setProductRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >({});
+  const trackedStoreRef = useRef(false);
+  const appliedReorderRef = useRef(false);
+  const reorderReservationId = searchParams.get("reorder");
 
   const loadStore = useCallback(async () => {
     async function queryStore(includeImage: boolean) {
@@ -222,7 +237,8 @@ export default function StorePage() {
 
     setStore(normalizeStore(data));
 
-    const { data: productsData, error: productsError } = await supabase
+    async function queryProducts(includeRestricted: boolean) {
+      return supabase
       .from("store_products")
       .select(
         `
@@ -240,6 +256,7 @@ export default function StorePage() {
             category:categories!products_category_id_fkey (
               id,
               name
+              ${includeRestricted ? ", is_age_restricted" : ""}
             )
           )
         `
@@ -248,6 +265,14 @@ export default function StorePage() {
       .eq("is_available", true)
       .gt("stock", 0)
       .order("created_at", { ascending: false });
+    }
+
+    let { data: productsData, error: productsError } = await queryProducts(true);
+    if (productsError && isMissingColumnError(productsError)) {
+      const fallback = await queryProducts(false);
+      productsData = fallback.data;
+      productsError = fallback.error;
+    }
 
     if (productsError) {
       setNotice({ type: "error", message: productsError.message });
@@ -260,6 +285,34 @@ export default function StorePage() {
         normalizeStoreCatalogItem
       )
     );
+    const [storeReviewResponse, productReviewResponse] = await Promise.all([
+      supabase
+        .from("store_review_summaries")
+        .select("rating_average, review_count")
+        .eq("store_id", storeId)
+        .maybeSingle(),
+      supabase
+        .from("product_review_summaries")
+        .select("store_product_id, rating_average, review_count")
+        .in(
+          "store_product_id",
+          ((productsData as RawStoreCatalogItem[]) ?? []).map((item) => item.id)
+        ),
+    ]);
+    if (storeReviewResponse.data) {
+      setStoreRating({
+        average: Number(storeReviewResponse.data.rating_average ?? 0),
+        count: Number(storeReviewResponse.data.review_count ?? 0),
+      });
+    }
+    const ratings: Record<string, { average: number; count: number }> = {};
+    (productReviewResponse.data ?? []).forEach((row) => {
+      ratings[row.store_product_id] = {
+        average: Number(row.rating_average ?? 0),
+        count: Number(row.review_count ?? 0),
+      };
+    });
+    setProductRatings(ratings);
     setLoading(false);
   }, [storeId, supabase]);
 
@@ -278,7 +331,7 @@ export default function StorePage() {
     async function loadRole(userId: string) {
       const { data } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, adult_content_confirmed")
         .eq("id", userId)
         .maybeSingle();
 
@@ -287,6 +340,7 @@ export default function StorePage() {
       if (typeof data?.role === "string") {
         setCurrentRole(data.role);
       }
+      setAdultConfirmed(data?.adult_content_confirmed === true);
     }
 
     async function loadSession() {
@@ -349,6 +403,12 @@ export default function StorePage() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (!store || trackedStoreRef.current) return;
+    trackedStoreRef.current = true;
+    void recordStoreEvent(supabase, { eventType: "store_view", storeId: store.id });
+  }, [store, supabase]);
 
   const catalogCategories = useMemo(() => {
     const categoriesByKey = new Map<string, CatalogCategory>();
@@ -436,6 +496,65 @@ export default function StorePage() {
     return () => window.clearTimeout(timer);
   }, [catalog, highlightedProductId]);
 
+  useEffect(() => {
+    if (!highlightedProductId || !store) return;
+    void recordStoreEvent(supabase, {
+      eventType: "product_view",
+      storeId: store.id,
+      storeProductId: highlightedProductId,
+    });
+  }, [highlightedProductId, store, supabase]);
+
+  useEffect(() => {
+    if (
+      !reorderReservationId ||
+      !currentUserId ||
+      !catalog.length ||
+      appliedReorderRef.current
+    ) return;
+    appliedReorderRef.current = true;
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("id, customer_user_id, reservation_items(store_product_id, quantity)")
+        .eq("id", reorderReservationId)
+        .eq("customer_user_id", currentUserId)
+        .maybeSingle();
+      if (error || !data) return;
+
+      const available: CartItem[] = [];
+      const unavailable: string[] = [];
+      const rawItems = (data.reservation_items ?? []) as Array<{
+        store_product_id: string;
+        quantity: number;
+      }>;
+      rawItems.forEach((oldItem) => {
+        const current = catalog.find((item) => item.id === oldItem.store_product_id);
+        if (!current?.product || current.stock <= 0) {
+          unavailable.push(current?.product?.product_name ?? "Un producto");
+          return;
+        }
+        available.push({
+          store_product_id: current.id,
+          product_name: current.product.product_name,
+          price: Number(current.price),
+          quantity: Math.min(oldItem.quantity, current.stock),
+          image_url: current.image_url,
+          stock: current.stock,
+          is_age_restricted: current.product.is_age_restricted,
+        });
+      });
+      setCartItems(available);
+      setNotice({
+        type: unavailable.length ? "warning" : "success",
+        message: unavailable.length
+          ? `Reconstruimos tu pedido con precios actuales. No disponibles: ${unavailable.join(", ")}.`
+          : "Pedido reconstruido con precios y stock actuales.",
+      });
+    })();
+  }, [catalog, currentUserId, reorderReservationId, supabase]);
+
   function addItemToCart(item: CartItem) {
     setCartItems((prev) => {
       const existing = prev.find(
@@ -482,6 +601,7 @@ export default function StorePage() {
       quantity: qty,
       image_url: item.image_url,
       stock: item.stock,
+      is_age_restricted: item.product.is_age_restricted,
     });
 
     setNotice({
@@ -553,6 +673,14 @@ export default function StorePage() {
       setNotice({
         type: "warning",
         message: "Solo las cuentas de cliente pueden confirmar reservas.",
+      });
+      return;
+    }
+
+    if (cartItems.some((item) => item.is_age_restricted) && !adultConfirmed) {
+      setNotice({
+        type: "warning",
+        message: "Debes declarar que eres mayor de edad para reservar artículos 18+.",
       });
       return;
     }
@@ -654,9 +782,15 @@ export default function StorePage() {
             </div>
 
             <div className="mt-6 border-b border-[#e5e7eb] pb-6">
-              <h1 className="page-title text-3xl sm:text-4xl">
-                {store.store_name}
-              </h1>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="page-title text-3xl sm:text-4xl">{store.store_name}</h1>
+                  <div className="mt-2">
+                    <RatingSummary average={storeRating.average} count={storeRating.count} />
+                  </div>
+                </div>
+                <FavoriteButton kind="store" id={store.id} storeId={store.id} />
+              </div>
               <p className="mt-3 max-w-3xl text-muted">
                 {store.description || "Tienda disponible cerca de ti."}
               </p>
@@ -762,11 +896,22 @@ export default function StorePage() {
                           )}
                         </div>
 
-                        <h3 className="mt-4 text-lg font-semibold">
-                          {item.product?.product_name ?? "Producto"}
-                        </h3>
+                        <div className="mt-4 flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-semibold">
+                              {item.product?.product_name ?? "Producto"}
+                            </h3>
+                            <RatingSummary
+                              average={productRatings[item.id]?.average ?? 0}
+                              count={productRatings[item.id]?.count ?? 0}
+                              compact
+                            />
+                          </div>
+                          <FavoriteButton kind="product" id={item.id} storeId={store.id} />
+                        </div>
                         <p className="mt-1 text-xs font-semibold uppercase text-[var(--primary)]">
                           {item.product?.category_name ?? "Sin categoria"}
+                          {item.product?.is_age_restricted ? " · 18+" : ""}
                         </p>
                         <p className="mt-2 line-clamp-2 text-sm text-muted">
                           {item.product?.description || "Sin descripcion"}
@@ -895,6 +1040,27 @@ export default function StorePage() {
                   </div>
                 </div>
 
+                {cartItems.some((item) => item.is_age_restricted) && (
+                  <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    <input
+                      type="checkbox"
+                      checked={adultConfirmed}
+                      onChange={async (event) => {
+                        const checked = event.target.checked;
+                        setAdultConfirmed(checked);
+                        if (currentUserId) {
+                          await supabase
+                            .from("profiles")
+                            .update({ adult_content_confirmed: checked })
+                            .eq("id", currentUserId);
+                        }
+                      }}
+                      className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+                    />
+                    Declaro que soy mayor de 18 años y presentaré identificación si la tienda la solicita.
+                  </label>
+                )}
+
                 <PickupTimePicker
                   slots={pickupSlots}
                   value={pickupTime}
@@ -944,6 +1110,9 @@ export default function StorePage() {
                     Vaciar reserva
                   </button>
                 )}
+                <Link href="/complaints" className="text-center text-xs text-muted underline">
+                  Libro de Reclamaciones demostrativo
+                </Link>
               </div>
             </div>
           </aside>
