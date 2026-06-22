@@ -12,6 +12,10 @@ que guardan datos nuevos requieren aplicar la migración.
 4. Para Web Push, configurar primero en Vercel los secretos requeridos y luego
    ejecutar `supabase/push_external_setup.sql` después de reemplazar los valores
    indicados mediante Supabase Vault.
+5. Si una cuenta de vendedor existente no es reconocida por la analítica,
+   ejecutar `supabase/fix_merchant_analytics_access.sql`. La web dispone de un
+   respaldo seguro en Vercel, pero esta migración deja el diagnóstico y la
+   definición de productos entregados resueltos directamente en Supabase.
 
 ## 2. Vercel
 
