@@ -15,7 +15,6 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/client";
 import { signOutCurrentSession } from "../lib/auth/sign-out";
 import { getUserMetadataProfile, readProfileWithFallback } from "../lib/auth/profile";
-import ThemeToggle from "./theme-toggle";
 
 type RoleType = "customer" | "merchant" | "admin" | null;
 
@@ -321,8 +320,6 @@ export default function AuthAccessMenu() {
                 <Settings size={17} />
                 Preferencias
               </Link>
-
-              <ThemeToggle compact />
 
               <div
                 className="my-2"

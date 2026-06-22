@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Store } from "lucide-react";
 import AuthAccessMenu from "./auth-access-menu";
 import NotificationCenter from "./notification-center";
+import PublicThemeMenu from "./public-theme-menu";
 
 export default function AppHeader() {
   return (
@@ -29,6 +30,7 @@ export default function AppHeader() {
         </Link>
 
         <div className="flex items-center gap-2">
+          <PublicThemeMenu />
           <NotificationCenter />
           <AuthAccessMenu />
         </div>
