@@ -142,6 +142,7 @@ export default function MerchantAnalyticsPage() {
   const [setupStatus, setSetupStatus] = useState<MerchantSetupStatus | null>(
     null
   );
+  const [setupSource, setSetupSource] = useState<"rpc" | "server">("rpc");
   const [setupIssue, setSetupIssue] = useState<SetupIssue | null>(null);
   const [analyticsError, setAnalyticsError] = useState("");
   const [from, setFrom] = useState(() => isoDate(29));
@@ -200,6 +201,7 @@ export default function MerchantAnalyticsPage() {
       const fallbackRow =
         (await response.json()) as RawMerchantSetupStatus;
       const fallbackStatus = normalizeSetupStatus(fallbackRow);
+      setSetupSource("server");
       setSetupStatus(fallbackStatus);
 
       if (
@@ -228,6 +230,7 @@ export default function MerchantAnalyticsPage() {
     const status = normalizeSetupStatus(
       rawRow as RawMerchantSetupStatus
     );
+    setSetupSource("rpc");
     setSetupStatus(status);
 
     if (status.userRole !== "merchant" && status.userRole !== "admin") {
@@ -242,7 +245,12 @@ export default function MerchantAnalyticsPage() {
   }, [router, supabase]);
 
   const loadAnalytics = useCallback(
-    async (storeId: string, start: string, end: string) => {
+    async (
+      storeId: string,
+      start: string,
+      end: string,
+      source: "rpc" | "server"
+    ) => {
       setAnalyticsLoading(true);
       setAnalyticsError("");
 
@@ -250,11 +258,53 @@ export default function MerchantAnalyticsPage() {
       const toDate = new Date(`${end}T00:00:00-05:00`);
       toDate.setDate(toDate.getDate() + 1);
 
-      const { data, error } = await supabase.rpc("get_merchant_analytics", {
-        p_store_id: storeId,
-        p_from: fromIso,
-        p_to: toDate.toISOString(),
-      });
+      let data: AnalyticsData | null = null;
+      let error: { code?: string; message: string } | null = null;
+
+      if (source === "server") {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          error = { message: "La sesión ha expirado." };
+        } else {
+          const params = new URLSearchParams({
+            from: fromIso,
+            to: toDate.toISOString(),
+          });
+          const response = await fetch(
+            `/api/merchant/analytics?${params.toString()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              cache: "no-store",
+            }
+          );
+
+          if (response.ok) {
+            data = (await response.json()) as AnalyticsData;
+          } else {
+            const responseBody = (await response.json().catch(() => null)) as
+              | { error?: string }
+              | null;
+            error = {
+              message:
+                responseBody?.error ??
+                "No se pudieron calcular las métricas.",
+            };
+          }
+        }
+      } else {
+        const rpcResponse = await supabase.rpc("get_merchant_analytics", {
+          p_store_id: storeId,
+          p_from: fromIso,
+          p_to: toDate.toISOString(),
+        });
+        data = rpcResponse.data as AnalyticsData | null;
+        error = rpcResponse.error;
+      }
 
       if (error) {
         console.error("No se pudieron cargar las métricas de la tienda.", error);
@@ -264,7 +314,7 @@ export default function MerchantAnalyticsPage() {
             : "No pudimos cargar las métricas en este momento. Intenta nuevamente."
         );
       } else {
-        setAnalytics({ ...emptyAnalytics, ...(data as AnalyticsData) });
+        setAnalytics({ ...emptyAnalytics, ...(data ?? {}) });
       }
 
       setAnalyticsLoading(false);
@@ -284,11 +334,18 @@ export default function MerchantAnalyticsPage() {
     if (!setupStatus?.storeId || setupIssue) return;
 
     const timer = window.setTimeout(() => {
-      void loadAnalytics(setupStatus.storeId!, from, to);
+      void loadAnalytics(setupStatus.storeId!, from, to, setupSource);
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [from, loadAnalytics, setupIssue, setupStatus?.storeId, to]);
+  }, [
+    from,
+    loadAnalytics,
+    setupIssue,
+    setupSource,
+    setupStatus?.storeId,
+    to,
+  ]);
 
   async function exportCsv() {
     if (!setupStatus?.storeId) return;
@@ -449,7 +506,12 @@ export default function MerchantAnalyticsPage() {
           <button
             type="button"
             onClick={() =>
-              void loadAnalytics(setupStatus.storeId!, from, to)
+              void loadAnalytics(
+                setupStatus.storeId!,
+                from,
+                to,
+                setupSource
+              )
             }
             className="btn-soft mt-4"
           >
