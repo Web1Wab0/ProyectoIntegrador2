@@ -762,9 +762,9 @@ export default function StorePage() {
           </div>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
-          <div>
-            <div className="relative h-[260px] overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4] sm:h-[380px]">
+        <section className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start">
+          <div className="min-w-0">
+            <div className="relative h-[260px] w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4] sm:h-[380px]">
               {store.image_url ? (
                 <Image
                   src={store.image_url}
@@ -781,9 +781,9 @@ export default function StorePage() {
               )}
             </div>
 
-            <div className="mt-6 border-b border-[#e5e7eb] pb-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+            <div className="mt-6 min-w-0 border-b border-[#e5e7eb] pb-6">
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <div className="min-w-0">
                   <h1 className="page-title text-3xl sm:text-4xl">{store.store_name}</h1>
                   <div className="mt-2">
                     <RatingSummary average={storeRating.average} count={storeRating.count} />
@@ -791,7 +791,7 @@ export default function StorePage() {
                 </div>
                 <FavoriteButton kind="store" id={store.id} storeId={store.id} />
               </div>
-              <p className="mt-3 max-w-3xl text-muted">
+              <p className="mt-3 max-w-3xl break-words text-muted">
                 {store.description || "Tienda disponible cerca de ti."}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -799,7 +799,7 @@ export default function StorePage() {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)]">
                     <MapPin size={18} />
                   </div>
-                  <div className="min-w-0 text-sm">
+                  <div className="min-w-0 break-words text-sm">
                     <p className="font-semibold text-[var(--on-surface)]">
                       Ubicación
                     </p>
@@ -816,7 +816,7 @@ export default function StorePage() {
               </div>
             </div>
 
-            <section className="mt-8">
+            <section className="mt-8 min-w-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-2xl font-bold">Productos</h2>
@@ -827,7 +827,7 @@ export default function StorePage() {
               </div>
 
               {catalog.length > 0 && (
-                <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
+                <div className="mt-5 flex max-w-full gap-2 overflow-x-auto pb-2">
                   <button
                     type="button"
                     onClick={() => setActiveCategoryId("all")}
@@ -866,7 +866,7 @@ export default function StorePage() {
                   Esta tienda todavia no tiene productos disponibles.
                 </div>
               ) : (
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                <div className="mt-6 grid min-w-0 gap-5 md:grid-cols-2">
                   {filteredCatalog.map((item) => {
                     const highlighted = item.id === highlightedProductId;
 
@@ -874,7 +874,7 @@ export default function StorePage() {
                       <article
                         key={item.id}
                         ref={highlighted ? highlightedRef : null}
-                        className={`rounded-xl border bg-white p-4 transition ${
+                        className={`min-w-0 max-w-full rounded-xl border bg-white p-4 transition ${
                           highlighted
                             ? "border-[var(--primary)] shadow-[0_10px_30px_rgba(121,0,243,0.13)]"
                             : "border-[var(--border)] hover:shadow-md"
@@ -896,9 +896,9 @@ export default function StorePage() {
                           )}
                         </div>
 
-                        <div className="mt-4 flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-semibold">
+                        <div className="mt-4 flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="break-words text-lg font-semibold">
                               {item.product?.product_name ?? "Producto"}
                             </h3>
                             <RatingSummary
@@ -913,7 +913,7 @@ export default function StorePage() {
                           {item.product?.category_name ?? "Sin categoria"}
                           {item.product?.is_age_restricted ? " · 18+" : ""}
                         </p>
-                        <p className="mt-2 line-clamp-2 text-sm text-muted">
+                        <p className="mt-2 line-clamp-2 break-words text-sm text-muted">
                           {item.product?.description || "Sin descripcion"}
                         </p>
                         <div className="mt-3 text-sm text-muted">
@@ -952,26 +952,28 @@ export default function StorePage() {
             </section>
           </div>
 
-          <aside className="lg:sticky lg:top-24">
-            <div className="rounded-xl border border-[var(--border)] bg-white p-5 shadow-[0_14px_36px_rgba(44,47,48,0.10)]">
+          <aside className="min-w-0 w-full max-w-full lg:sticky lg:top-24">
+            <div className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-white p-5 shadow-[0_14px_36px_rgba(44,47,48,0.10)]">
               <h2 className="flex items-center gap-2 text-xl font-bold">
                 <ShoppingBasket size={21} className="text-[var(--primary)]" />
                 Tu reserva
               </h2>
-              <p className="mt-1 text-sm text-muted">{store.store_name}</p>
+              <p className="mt-1 break-words text-sm text-muted">
+                {store.store_name}
+              </p>
 
               {cartItems.length === 0 ? (
                 <div className="info-box mt-4">
                   Todavia no agregaste productos.
                 </div>
               ) : (
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 min-w-0 space-y-3">
                   {cartItems.map((item) => (
                     <div
                       key={item.store_product_id}
-                      className="rounded-2xl bg-[#f7f7f7] p-3"
+                      className="min-w-0 w-full max-w-full rounded-2xl bg-[#f7f7f7] p-3"
                     >
-                      <div className="flex gap-3">
+                      <div className="flex min-w-0 gap-3">
                         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#eef1f4]">
                           {item.image_url ? (
                             <Image
@@ -984,7 +986,7 @@ export default function StorePage() {
                           ) : null}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">
+                          <p className="break-words text-sm font-semibold">
                             {item.product_name}
                           </p>
                           <p className="text-sm text-muted">
@@ -993,7 +995,7 @@ export default function StorePage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
                         <input
                           type="number"
                           min="1"
@@ -1005,7 +1007,7 @@ export default function StorePage() {
                               Number(e.target.value)
                             )
                           }
-                          className="app-input h-11 flex-1 py-2"
+                          className="app-input h-11 min-w-0 max-w-full py-2"
                         />
                         <button
                           type="button"
@@ -1021,27 +1023,27 @@ export default function StorePage() {
                 </div>
               )}
 
-              <div className="mt-5 grid gap-3">
-                <div>
+              <div className="mt-5 grid min-w-0 gap-3">
+                <div className="min-w-0">
                   <div className="mb-2 flex items-center gap-2">
                     <CalendarDays size={17} className="text-[var(--primary)]" />
                     <label className="text-sm font-semibold">
                       Fecha de recojo
                     </label>
                   </div>
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
+                  <div className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
                     <input
                       type="date"
                       value={pickupDate}
                       min={getTodayDateInput()}
                       onChange={(e) => setPickupDate(e.target.value)}
-                      className="app-input border-0 bg-white"
+                      className="app-input min-w-0 max-w-full border-0 bg-white"
                     />
                   </div>
                 </div>
 
                 {cartItems.some((item) => item.is_age_restricted) && (
-                  <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <label className="flex min-w-0 max-w-full items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
                     <input
                       type="checkbox"
                       checked={adultConfirmed}
@@ -1057,7 +1059,9 @@ export default function StorePage() {
                       }}
                       className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                     />
-                    Declaro que soy mayor de 18 años y presentaré identificación si la tienda la solicita.
+                    <span className="min-w-0 break-words">
+                      Declaro que soy mayor de 18 años y presentaré identificación si la tienda la solicita.
+                    </span>
                   </label>
                 )}
 
@@ -1077,7 +1081,7 @@ export default function StorePage() {
                     value={reservationNotes}
                     onChange={(e) => setReservationNotes(e.target.value)}
                     placeholder="Ejemplo: pasare despues del trabajo"
-                    className="app-input"
+                    className="app-input min-w-0 max-w-full"
                   />
                 </div>
               </div>
@@ -1110,7 +1114,10 @@ export default function StorePage() {
                     Vaciar reserva
                   </button>
                 )}
-                <Link href="/complaints" className="text-center text-xs text-muted underline">
+                <Link
+                  href="/complaints"
+                  className="break-words text-center text-xs text-muted underline"
+                >
                   Libro de Reclamaciones demostrativo
                 </Link>
               </div>

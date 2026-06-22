@@ -17,7 +17,7 @@ export default function PickupTimePicker({
   isClosed,
 }: Props) {
   return (
-    <div>
+    <div className="min-w-0 max-w-full">
       <div className="mb-2 flex items-center gap-2">
         <Clock3 size={17} className="text-[var(--primary)]" />
         <span className="text-sm font-semibold">Hora disponible</span>
@@ -39,7 +39,7 @@ export default function PickupTimePicker({
         </div>
       ) : (
         <div
-          className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-2 sm:grid-cols-3"
+          className="grid min-w-0 max-w-full max-h-52 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-2 sm:grid-cols-3"
           role="radiogroup"
           aria-label="Horas disponibles para recoger"
         >
@@ -53,7 +53,7 @@ export default function PickupTimePicker({
                 role="radio"
                 aria-checked={selected}
                 onClick={() => onChange(slot.value)}
-                className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
+                className={`min-h-10 min-w-0 rounded-lg border px-3 py-2 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                   selected
                     ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm"
                     : "border-[var(--border)] bg-white text-[var(--on-surface)] hover:border-[rgba(121,0,243,0.35)] hover:bg-[rgba(121,0,243,0.04)]"
