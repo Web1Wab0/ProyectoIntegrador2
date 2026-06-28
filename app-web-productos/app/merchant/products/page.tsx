@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import PageLoading from "../../../components/page-loading";
 import { useToast } from "../../../components/toast-provider";
+import NumberStepper from "../../../components/number-stepper";
 
 type Category = {
   id: string;
@@ -507,7 +508,7 @@ export default function MerchantProductsPage() {
     const numericStock = Number(stock);
     const numericLowStockThreshold = Number(lowStockThreshold);
 
-    if (Number.isNaN(numericPrice) || numericPrice < 0) {
+    if (price.trim() === "" || Number.isNaN(numericPrice) || numericPrice < 0) {
       showToast({
         type: "warning",
         title: "Precio no válido",
@@ -517,7 +518,7 @@ export default function MerchantProductsPage() {
       return;
     }
 
-    if (Number.isNaN(numericStock) || numericStock < 0) {
+    if (stock.trim() === "" || Number.isNaN(numericStock) || numericStock < 0) {
       showToast({
         type: "warning",
         title: "Stock no válido",
@@ -1313,45 +1314,35 @@ function ProductDrawer({
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="mb-2 block small-label">
-                    Precio <span className="text-[var(--danger)]">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <NumberStepper
+                    label="Precio *"
                     value={price}
-                    onChange={(event) => onPriceChange(event.target.value)}
-                    required
-                    className="app-input"
+                    min={0}
+                    step={0.1}
+                    precision={2}
+                    inputMode="decimal"
+                    onChange={onPriceChange}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block small-label">
-                    Stock <span className="text-[var(--danger)]">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumberStepper
+                    label="Stock *"
                     value={stock}
-                    onChange={(event) => onStockChange(event.target.value)}
-                    required
-                    className="app-input"
+                    min={0}
+                    step={1}
+                    onChange={onStockChange}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block small-label">Avisar en</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="9999"
+                  <NumberStepper
+                    label="Avisar en"
+                    max={9999}
                     value={lowStockThreshold}
-                    onChange={(event) =>
-                      onLowStockThresholdChange(event.target.value)
-                    }
-                    className="app-input"
+                    min={0}
+                    step={1}
+                    onChange={onLowStockThresholdChange}
                   />
                 </div>
               </div>

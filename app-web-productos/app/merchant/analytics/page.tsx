@@ -39,6 +39,7 @@ import {
 import { createClient } from "../../../lib/supabase/client";
 import PageLoading from "../../../components/page-loading";
 import Notice from "../../../components/notice";
+import DatePicker from "../../../components/date-picker";
 
 type AnalyticsData = {
   store_views: number;
@@ -440,19 +441,25 @@ export default function MerchantAnalyticsPage() {
   return (
     <AnalyticsShell
       actions={
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="date"
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <DatePicker
+            label="Desde"
             value={from}
-            onChange={(event) => setFrom(event.target.value)}
-            className="app-input"
+            onChange={(nextValue) => {
+              setFrom(nextValue);
+              if (to < nextValue) setTo(nextValue);
+            }}
+            today={isoDate(0)}
+            className="sm:w-56"
           />
-          <input
-            type="date"
+          <DatePicker
+            label="Hasta"
             value={to}
             min={from}
-            onChange={(event) => setTo(event.target.value)}
-            className="app-input"
+            onChange={setTo}
+            today={isoDate(0)}
+            align="right"
+            className="sm:w-56"
           />
           <button
             type="button"

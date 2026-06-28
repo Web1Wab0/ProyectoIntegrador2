@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CalendarDays,
   MapPin,
   PackageSearch,
   Plus,
@@ -31,6 +30,8 @@ import RatingSummary from "../../../components/rating-summary";
 import { recordStoreEvent } from "../../../lib/analytics";
 import EmptyState from "../../../components/empty-state";
 import { SkeletonGrid } from "../../../components/skeleton-card";
+import DatePicker from "../../../components/date-picker";
+import NumberStepper from "../../../components/number-stepper";
 
 const UNCATEGORIZED_ID = "uncategorized";
 const springTransition = {
@@ -312,18 +313,13 @@ function ProductDetailModal({
                 </p>
               </div>
               <div className="w-28">
-                <label className="mb-2 block text-xs font-semibold text-muted">
-                  Cantidad
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={item.stock}
+                <NumberStepper
+                  label="Cantidad"
                   value={quantity}
-                  onChange={(event) =>
-                    onQuantityChange(Number(event.target.value))
-                  }
-                  className="app-input h-11"
+                  min={1}
+                  max={item.stock}
+                  step={1}
+                  onChange={(nextValue) => onQuantityChange(Number(nextValue))}
                 />
               </div>
             </div>
@@ -1041,18 +1037,17 @@ export default function StorePage() {
                     </div>
 
                     <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max={item.stock}
+                      <NumberStepper
                         value={item.quantity}
-                        onChange={(e) =>
+                        min={1}
+                        max={item.stock}
+                        step={1}
+                        onChange={(nextValue) =>
                           updateCartItemQuantity(
                             item.store_product_id,
-                            Number(e.target.value)
+                            Number(nextValue)
                           )
                         }
-                        className="app-input h-11 min-w-0 max-w-full py-2"
                       />
                       <button
                         type="button"
@@ -1071,19 +1066,21 @@ export default function StorePage() {
 
           <div className="mt-5 grid min-w-0 gap-3">
             <div className="min-w-0">
-              <div className="mb-2 flex items-center gap-2">
-                <CalendarDays size={17} className="text-[var(--primary)]" />
-                <label className="text-sm font-semibold">Fecha de recojo</label>
-              </div>
-              <div className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
-                <input
-                  type="date"
-                  value={pickupDate}
-                  min={getTodayDateInput()}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  className="app-input min-w-0 max-w-full border-0 bg-[var(--surface-lowest)]"
-                />
-              </div>
+              <DatePicker
+                label="Fecha de recojo"
+                value={pickupDate}
+                min={getTodayDateInput()}
+                today={getTodayDateInput()}
+                onChange={setPickupDate}
+                isDateDisabled={(dateValue) => {
+                  const day = getOpeningDayForDate(dateValue, store.opening_hours);
+                  return !day || day.closed;
+                }}
+                getDateHint={(dateValue) => {
+                  const day = getOpeningDayForDate(dateValue, store.opening_hours);
+                  return !day || day.closed ? "Tienda cerrada" : null;
+                }}
+              />
             </div>
 
             {cartItems.some((item) => item.is_age_restricted) && (
@@ -1419,18 +1416,18 @@ export default function StorePage() {
                           </div>
 
                           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                            <input
-                              type="number"
-                              min="1"
-                              max={item.stock}
+                            <NumberStepper
                               value={quantityById[item.id] ?? 1}
-                              onChange={(e) =>
+                              min={1}
+                              max={item.stock}
+                              step={1}
+                              className="sm:w-32"
+                              onChange={(nextValue) =>
                                 setQuantityById((prev) => ({
                                   ...prev,
-                                  [item.id]: Number(e.target.value),
+                                  [item.id]: Number(nextValue),
                                 }))
                               }
-                              className="app-input sm:w-24"
                             />
                             <button
                               type="button"
