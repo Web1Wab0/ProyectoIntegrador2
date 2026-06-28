@@ -174,11 +174,9 @@ export default function AuthAccessMenu() {
 
       {open && (
         <div
-          className="absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-xl border border-[var(--border)] p-2 shadow-xl sm:w-72"
+          className="motion-pop surface-popover absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-2xl p-2 sm:w-72"
           style={{
-            background: "var(--surface-lowest)",
             color: "var(--on-surface)",
-            boxShadow: "0 12px 40px var(--shadow)",
           }}
         >
           {!isLoggedIn ? (

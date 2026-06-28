@@ -93,7 +93,7 @@ export default function PublicThemeMenu() {
         <div
           role="menu"
           aria-label="Seleccionar tema"
-          className="absolute right-0 z-[10020] mt-3 w-64 rounded-xl border border-[var(--border)] bg-[var(--surface-lowest)] p-2 shadow-[0_16px_45px_var(--shadow)]"
+          className="motion-pop surface-popover absolute right-0 z-[10020] mt-3 w-64 rounded-2xl p-2"
         >
           <div className="flex items-center justify-between px-3 py-2">
             <div>

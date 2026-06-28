@@ -7,7 +7,7 @@ import PublicThemeMenu from "./public-theme-menu";
 export default function AppHeader() {
   return (
     <header
-      className="fixed inset-x-0 top-0 z-[10000] border-b border-[var(--border)] backdrop-blur-xl"
+      className="fixed inset-x-0 top-0 z-[10000] border-b border-[var(--border)] shadow-[0_1px_0_rgba(255,255,255,0.35)] backdrop-blur-xl"
       style={{ background: "var(--header-bg)" }}
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-10">

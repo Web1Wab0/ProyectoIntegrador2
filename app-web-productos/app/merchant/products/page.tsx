@@ -1200,12 +1200,12 @@ function ProductDrawer({
     <div className="fixed inset-0 z-[10040] flex justify-end">
       <button
         type="button"
-        className="absolute inset-0 bg-black/35"
+        className="motion-fade absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         aria-label="Cerrar panel"
         onClick={onClose}
       />
 
-      <aside className="relative flex h-full w-full max-w-xl flex-col overflow-hidden bg-[var(--surface-lowest)] shadow-2xl">
+      <aside className="motion-sheet relative flex h-full w-full max-w-xl flex-col overflow-hidden bg-[var(--surface-lowest)] shadow-[var(--shadow-elevated)]">
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] p-4 sm:p-6">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-[var(--primary)]">

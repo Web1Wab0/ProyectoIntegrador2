@@ -175,7 +175,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={toast.id}
               role={toast.type === "error" ? "alert" : "status"}
-              className={`toast-enter pointer-events-auto flex w-full items-start gap-3 rounded-xl border bg-white p-4 shadow-[0_16px_45px_rgba(44,47,48,0.16)] ${style.borderClass}`}
+              className={`toast-enter surface-popover pointer-events-auto flex w-full items-start gap-3 rounded-2xl p-4 ${style.borderClass}`}
             >
               {toast.href ? (
                 <Link

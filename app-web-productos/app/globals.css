@@ -19,6 +19,13 @@
   --header-bg: rgba(255, 255, 255, 0.9);
   --map-placeholder: #eef1f4;
   --shadow: rgba(44, 47, 48, 0.09);
+  --shadow-soft: 0 8px 24px rgba(44, 47, 48, 0.09);
+  --shadow-popover: 0 18px 55px rgba(44, 47, 48, 0.18);
+  --shadow-elevated: 0 24px 70px rgba(44, 47, 48, 0.22);
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-medium: 220ms;
 }
 
 html[data-theme="dark"] {
@@ -34,6 +41,9 @@ html[data-theme="dark"] {
   --header-bg: rgba(16, 17, 20, 0.9);
   --map-placeholder: #252831;
   --shadow: rgba(0, 0, 0, 0.32);
+  --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --shadow-popover: 0 18px 60px rgba(0, 0, 0, 0.42);
+  --shadow-elevated: 0 26px 78px rgba(0, 0, 0, 0.5);
 }
 
 html {
@@ -64,13 +74,22 @@ body {
     background: var(--surface-lowest);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    box-shadow: 0 8px 24px var(--shadow);
+    box-shadow: var(--shadow-soft);
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-medium) var(--ease-standard),
+      transform var(--duration-medium) var(--ease-standard);
   }
 
   .app-card-soft {
     background: var(--surface-high);
     border: 1px solid rgba(227, 231, 235, 0.8);
     border-radius: 0.625rem;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      background var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-medium) var(--ease-standard),
+      transform var(--duration-medium) var(--ease-standard);
   }
 
   .app-input {
@@ -78,6 +97,10 @@ body {
     background: var(--surface-high);
     color: var(--on-surface);
     border: 1px solid transparent;
+    transition:
+      background var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
   }
 
   .app-input::placeholder {
@@ -94,16 +117,32 @@ body {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-center font-semibold text-white transition;
     background: linear-gradient(135deg, var(--primary), var(--primary-soft));
     box-shadow: 0 7px 18px rgba(121, 0, 243, 0.16);
+    transition:
+      filter var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
   }
 
   .btn-primary:hover {
     filter: brightness(0.96);
     transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(121, 0, 243, 0.22);
+  }
+
+  .btn-primary:active,
+  .btn-secondary:active,
+  .btn-soft:active,
+  .btn-danger:active,
+  .icon-button:active {
+    transform: translateY(0) scale(0.98);
   }
 
   .btn-secondary {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-center font-semibold text-white transition;
     background: var(--secondary);
+    transition:
+      filter var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard);
   }
 
   .btn-secondary:hover {
@@ -115,15 +154,24 @@ body {
     background: var(--surface-high);
     color: var(--on-surface);
     border-color: var(--border);
+    transition:
+      background var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
   }
 
   .btn-soft:hover {
     background: var(--surface-low);
+    box-shadow: 0 8px 22px var(--shadow);
   }
 
   .btn-danger {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4 py-2.5 text-center font-semibold text-white transition;
     background: var(--danger);
+    transition:
+      filter var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard);
   }
 
   .btn-primary:focus-visible,
@@ -137,11 +185,17 @@ body {
 
   .icon-button {
     @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-[var(--muted)] outline-none transition;
+    transition:
+      background var(--duration-fast) var(--ease-standard),
+      color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
   }
 
   .icon-button:hover {
     background: rgba(121, 0, 243, 0.07);
     color: var(--primary);
+    box-shadow: 0 7px 18px var(--shadow);
   }
 
   .page-title {
@@ -183,6 +237,11 @@ body {
     @apply rounded-xl border p-5 text-left transition;
     background: var(--surface-lowest);
     border-color: var(--border);
+    transition:
+      background var(--duration-fast) var(--ease-standard),
+      border-color var(--duration-fast) var(--ease-standard),
+      transform var(--duration-medium) var(--ease-standard),
+      box-shadow var(--duration-medium) var(--ease-standard);
   }
 
   .card-option-active {
@@ -236,6 +295,38 @@ body {
   .hero-gradient {
     background: linear-gradient(135deg, var(--primary), var(--primary-soft));
   }
+
+  .surface-popover {
+    background: var(--surface-lowest);
+    color: var(--on-surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-popover);
+  }
+
+  .motion-pop {
+    animation: popover-enter var(--duration-medium) var(--ease-emphasized);
+    transform-origin: top right;
+  }
+
+  .motion-sheet {
+    animation: sheet-enter var(--duration-medium) var(--ease-emphasized);
+  }
+
+  .motion-fade {
+    animation: fade-enter var(--duration-fast) var(--ease-standard);
+  }
+
+  .interactive-lift {
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-medium) var(--ease-standard),
+      transform var(--duration-medium) var(--ease-standard);
+  }
+
+  .interactive-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft);
+  }
 }
 
 html[data-theme="dark"] .bg-white,
@@ -285,11 +376,42 @@ html[data-theme="dark"] .border-\[\#d1d5db\] {
 @keyframes toast-enter {
   from {
     opacity: 0;
-    transform: translate3d(18px, -6px, 0);
+    transform: translate3d(16px, -6px, 0) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes popover-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes sheet-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes fade-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
