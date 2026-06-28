@@ -9,7 +9,8 @@ import {
   Settings,
   ShieldCheck,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "../lib/supabase/client";
@@ -27,7 +28,10 @@ type AccountState = {
 export default function AuthAccessMenu() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const pathname = usePathname();
+  const shouldReduceMotion = useReducedMotion() === true;
   const profileRequestIdRef = useRef(0);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -122,6 +126,34 @@ export default function AuthAccessMenu() {
     };
   }, [applySessionUser, enrichFromProfile, supabase]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   async function handleSignOut() {
     if (signingOut) return;
 
@@ -152,7 +184,7 @@ export default function AuthAccessMenu() {
     .join("");
 
   return (
-    <div className="relative max-w-full">
+    <div ref={menuRef} className="relative max-w-full">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="flex h-10 items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 sm:px-4"
@@ -172,13 +204,18 @@ export default function AuthAccessMenu() {
         </span>
       </button>
 
-      {open && (
-        <div
-          className="motion-pop surface-popover absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-2xl p-2 sm:w-72"
-          style={{
-            color: "var(--on-surface)",
-          }}
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="surface-popover absolute right-0 z-[9999] mt-3 w-[calc(100vw-2rem)] max-w-72 rounded-2xl p-2 sm:w-72"
+            style={{
+              color: "var(--on-surface)",
+            }}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.75 }}
+          >
           {!isLoggedIn ? (
             <>
               <Link
@@ -336,8 +373,9 @@ export default function AuthAccessMenu() {
               </button>
             </>
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

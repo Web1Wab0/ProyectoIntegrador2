@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Clock3 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMemo, useState } from "react";
 import {
   getCurrentLimaDayKey,
@@ -21,6 +22,7 @@ export default function StoreHoursDisplay({
   className = "",
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const shouldReduceMotion = useReducedMotion() === true;
   const status = useMemo(() => getStoreOpenStatus(hours), [hours]);
   const currentDayKey = useMemo(() => getCurrentLimaDayKey(), []);
 
@@ -72,45 +74,53 @@ export default function StoreHoursDisplay({
         </div>
       </div>
 
-      {expanded ? (
-        <div className={`${compact ? "mt-3" : "mt-4"} overflow-hidden rounded-lg border border-[var(--border)] bg-white`}>
-          {STORE_DAYS.map((day) => {
-            const dayHours = hours[day.key];
-            const isToday = day.key === currentDayKey;
+      <AnimatePresence initial={false}>
+        {expanded ? (
+          <motion.div
+            className={`${compact ? "mt-3" : "mt-4"} overflow-hidden rounded-lg border border-[var(--border)] bg-white`}
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={shouldReduceMotion ? undefined : { height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 360, damping: 36, mass: 0.8 }}
+          >
+            {STORE_DAYS.map((day) => {
+              const dayHours = hours[day.key];
+              const isToday = day.key === currentDayKey;
 
-            return (
-              <div
-                key={day.key}
-                className={`flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-2.5 text-sm last:border-b-0 ${
-                  isToday ? "bg-[rgba(121,0,243,0.055)]" : ""
-                }`}
-              >
-                <span
-                  className={
-                    isToday
-                      ? "font-semibold text-[var(--primary)]"
-                      : "text-[var(--on-surface)]"
-                  }
+              return (
+                <div
+                  key={day.key}
+                  className={`flex items-center justify-between gap-3 border-b border-[var(--border)] px-3 py-2.5 text-sm last:border-b-0 ${
+                    isToday ? "bg-[rgba(121,0,243,0.055)]" : ""
+                  }`}
                 >
-                  {day.label}
-                  {isToday ? " · Hoy" : ""}
-                </span>
-                <span
-                  className={
-                    !dayHours || dayHours.closed
-                      ? "font-medium text-[var(--muted-soft)]"
-                      : "font-medium text-[var(--on-surface)]"
-                  }
-                >
-                  {!dayHours || dayHours.closed
-                    ? "Cerrado"
-                    : `${dayHours.open} – ${dayHours.close}`}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+                  <span
+                    className={
+                      isToday
+                        ? "font-semibold text-[var(--primary)]"
+                        : "text-[var(--on-surface)]"
+                    }
+                  >
+                    {day.label}
+                    {isToday ? " · Hoy" : ""}
+                  </span>
+                  <span
+                    className={
+                      !dayHours || dayHours.closed
+                        ? "font-medium text-[var(--muted-soft)]"
+                        : "font-medium text-[var(--on-surface)]"
+                    }
+                  >
+                    {!dayHours || dayHours.closed
+                      ? "Cerrado"
+                      : `${dayHours.open} – ${dayHours.close}`}
+                  </span>
+                </div>
+              );
+            })}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

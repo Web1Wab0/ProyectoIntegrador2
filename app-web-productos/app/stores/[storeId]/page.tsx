@@ -225,7 +225,7 @@ function ProductDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`product-detail-${item.id}`}
-        className="relative z-10 grid max-h-[92dvh] w-full max-w-3xl min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-lowest)] shadow-[var(--shadow-popover)] sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
+        className="relative z-10 flex max-h-[92dvh] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-lowest)] shadow-[var(--shadow-popover)] sm:grid sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
         initial={
           shouldReduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }
         }
@@ -237,7 +237,7 @@ function ProductDetailModal({
       >
         <motion.div
           layoutId={`product-image-${item.id}`}
-          className="relative flex min-h-64 items-center justify-center bg-[#eef1f4] sm:min-h-full"
+          className="relative flex min-h-48 max-h-[32dvh] items-center justify-center bg-[#eef1f4] sm:max-h-none sm:min-h-full"
         >
           {item.image_url ? (
             <Image
@@ -253,7 +253,7 @@ function ProductDetailModal({
           )}
         </motion.div>
 
-        <div className="scrollbar-none min-w-0 overflow-y-auto p-5 sm:p-6">
+        <div className="scrollbar-none min-h-0 min-w-0 flex-1 overflow-y-auto p-5 sm:p-6">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase text-[var(--primary)]">
@@ -297,11 +297,11 @@ function ProductDetailModal({
             </span>
           </div>
 
-          <p className="mt-5 break-words text-sm leading-6 text-muted">
+          <p className="scrollbar-none mt-5 max-h-32 overflow-y-auto break-words text-sm leading-6 text-muted sm:max-h-none">
             {item.product?.description || "Sin descripcion disponible."}
           </p>
 
-          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-high)] p-4">
+          <div className="sticky bottom-0 -mx-5 mt-6 rounded-t-2xl border border-[var(--border)] bg-[var(--surface-lowest)] p-4 shadow-[0_-12px_30px_rgba(44,47,48,0.10)] sm:static sm:mx-0 sm:rounded-2xl sm:bg-[var(--surface-high)] sm:shadow-none">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase text-muted">
@@ -370,6 +370,7 @@ export default function StorePage() {
   const [activeCategoryId, setActiveCategoryId] = useState("all");
   const [quantityById, setQuantityById] = useState<Record<string, number>>({});
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [reservationSheetOpen, setReservationSheetOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<StoreCatalogItem | null>(
     null
   );
@@ -662,6 +663,7 @@ export default function StorePage() {
     (acc, item) => acc + item.price * item.quantity,
     0
   );
+  const cartQuantity = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   useEffect(() => {
     if (!pickupTime) return;
@@ -689,6 +691,19 @@ export default function StorePage() {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [selectedProduct]);
+
+  useEffect(() => {
+    if (!reservationSheetOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setReservationSheetOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [reservationSheetOpen]);
 
   useEffect(() => {
     if (!highlightedProductId || !catalog.length) return;
@@ -922,6 +937,7 @@ export default function StorePage() {
     }
 
     clearCart();
+    setReservationSheetOpen(false);
     setCreatingReservation(false);
     setNotice({
       type: "success",
@@ -931,6 +947,217 @@ export default function StorePage() {
     window.setTimeout(() => {
       window.location.replace("/customer/reservations");
     }, 1200);
+  }
+
+  function renderReservationPanel({ mobile = false }: { mobile?: boolean } = {}) {
+    if (!store) return null;
+
+    return (
+      <div
+        className={`flex min-h-0 w-full max-w-full flex-col overflow-hidden border border-[var(--border)] bg-white shadow-[0_14px_36px_rgba(44,47,48,0.10)] ${
+          mobile
+            ? "h-full rounded-t-[22px]"
+            : "max-h-[calc(100vh-7rem)] rounded-xl"
+        }`}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] p-5">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-xl font-bold">
+              <ShoppingBasket size={21} className="text-[var(--primary)]" />
+              Tu reserva
+            </h2>
+            <p className="mt-1 break-words text-sm text-muted">
+              {store.store_name}
+            </p>
+          </div>
+          {mobile ? (
+            <button
+              type="button"
+              onClick={() => setReservationSheetOpen(false)}
+              className="icon-button"
+              aria-label="Cerrar reserva"
+            >
+              <X size={19} />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto p-5">
+          {cartItems.length === 0 ? (
+            <div className="info-box">
+              Todavia no agregaste productos.
+            </div>
+          ) : (
+            <motion.div layout className="min-w-0 space-y-3">
+              <AnimatePresence initial={false}>
+                {cartItems.map((item) => (
+                  <motion.div
+                    key={item.store_product_id}
+                    layout
+                    initial={
+                      shouldReduceMotion
+                        ? false
+                        : { opacity: 0, y: 8, scale: 0.98 }
+                    }
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={
+                      shouldReduceMotion
+                        ? undefined
+                        : { opacity: 0, y: -8, scale: 0.98 }
+                    }
+                    transition={softSpringTransition}
+                    className="min-w-0 w-full max-w-full rounded-2xl bg-[#f7f7f7] p-3"
+                  >
+                    <div className="flex min-w-0 gap-3">
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#eef1f4]">
+                        {item.image_url ? (
+                          <Image
+                            src={item.image_url}
+                            alt={item.product_name}
+                            fill
+                            sizes="56px"
+                            className="object-contain p-1"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-semibold">
+                          {item.product_name}
+                        </p>
+                        <p className="text-sm text-muted">
+                          S/ {Number(item.price).toFixed(2)} c/u
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max={item.stock}
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateCartItemQuantity(
+                            item.store_product_id,
+                            Number(e.target.value)
+                          )
+                        }
+                        className="app-input h-11 min-w-0 max-w-full py-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCartItem(item.store_product_id)}
+                        className="icon-button text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
+                        aria-label={`Quitar ${item.product_name}`}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
+
+          <div className="mt-5 grid min-w-0 gap-3">
+            <div className="min-w-0">
+              <div className="mb-2 flex items-center gap-2">
+                <CalendarDays size={17} className="text-[var(--primary)]" />
+                <label className="text-sm font-semibold">Fecha de recojo</label>
+              </div>
+              <div className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
+                <input
+                  type="date"
+                  value={pickupDate}
+                  min={getTodayDateInput()}
+                  onChange={(e) => setPickupDate(e.target.value)}
+                  className="app-input min-w-0 max-w-full border-0 bg-white"
+                />
+              </div>
+            </div>
+
+            {cartItems.some((item) => item.is_age_restricted) && (
+              <label className="flex min-w-0 max-w-full items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <input
+                  type="checkbox"
+                  checked={adultConfirmed}
+                  onChange={async (event) => {
+                    const checked = event.target.checked;
+                    setAdultConfirmed(checked);
+                    if (currentUserId) {
+                      await supabase
+                        .from("profiles")
+                        .update({ adult_content_confirmed: checked })
+                        .eq("id", currentUserId);
+                    }
+                  }}
+                  className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+                />
+                <span className="min-w-0 break-words">
+                  Declaro que soy mayor de 18 años y presentaré identificación si la tienda la solicita.
+                </span>
+              </label>
+            )}
+
+            <PickupTimePicker
+              slots={pickupSlots}
+              value={pickupTime}
+              onChange={setPickupTime}
+              isClosed={selectedPickupDay?.closed === true}
+            />
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold">
+                Nota opcional
+              </label>
+              <input
+                type="text"
+                value={reservationNotes}
+                onChange={(e) => setReservationNotes(e.target.value)}
+                placeholder="Ejemplo: pasare despues del trabajo"
+                className="app-input min-w-0 max-w-full"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-[var(--border)] bg-white p-5">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">Total</span>
+            <span className="text-lg font-bold">S/ {cartTotal.toFixed(2)}</span>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <button
+              type="button"
+              onClick={handleCreateReservation}
+              disabled={creatingReservation}
+              className="btn-primary disabled:opacity-60"
+            >
+              {creatingReservation
+                ? "Confirmando..."
+                : !currentUserId
+                ? "Inicia sesion para confirmar"
+                : currentRole !== "customer"
+                ? "Solo cliente puede confirmar"
+                : "Confirmar reserva"}
+            </button>
+
+            {cartItems.length > 0 && (
+              <button type="button" onClick={clearCart} className="btn-soft">
+                Vaciar reserva
+              </button>
+            )}
+            <Link
+              href="/complaints"
+              className="break-words text-center text-xs text-muted underline"
+            >
+              Libro de Reclamaciones demostrativo
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -959,7 +1186,11 @@ export default function StorePage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-[var(--on-surface)]">
+    <main
+      className={`min-h-screen bg-white text-[var(--on-surface)] ${
+        cartItems.length > 0 ? "pb-28 lg:pb-0" : ""
+      }`}
+    >
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-center">
           <Link href="/" className="btn-soft">
@@ -1233,200 +1464,76 @@ export default function StorePage() {
           </div>
 
           <motion.aside
-            className="min-w-0 w-full max-w-full lg:sticky lg:top-24"
+            className="hidden min-w-0 w-full max-w-full lg:sticky lg:top-24 lg:block"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={softSpringTransition}
           >
-            <div className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-white p-5 shadow-[0_14px_36px_rgba(44,47,48,0.10)]">
-              <h2 className="flex items-center gap-2 text-xl font-bold">
-                <ShoppingBasket size={21} className="text-[var(--primary)]" />
-                Tu reserva
-              </h2>
-              <p className="mt-1 break-words text-sm text-muted">
-                {store.store_name}
-              </p>
-
-              {cartItems.length === 0 ? (
-                <div className="info-box mt-4">
-                  Todavia no agregaste productos.
-                </div>
-              ) : (
-                <motion.div layout className="mt-4 min-w-0 space-y-3">
-                  <AnimatePresence initial={false}>
-                    {cartItems.map((item) => (
-                      <motion.div
-                        key={item.store_product_id}
-                        layout
-                        initial={
-                          shouldReduceMotion
-                            ? false
-                            : { opacity: 0, y: 8, scale: 0.98 }
-                        }
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={
-                          shouldReduceMotion
-                            ? undefined
-                            : { opacity: 0, y: -8, scale: 0.98 }
-                        }
-                        transition={softSpringTransition}
-                        className="min-w-0 w-full max-w-full rounded-2xl bg-[#f7f7f7] p-3"
-                      >
-                        <div className="flex min-w-0 gap-3">
-                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#eef1f4]">
-                            {item.image_url ? (
-                              <Image
-                                src={item.image_url}
-                                alt={item.product_name}
-                                fill
-                                sizes="56px"
-                                className="object-contain p-1"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="break-words text-sm font-semibold">
-                              {item.product_name}
-                            </p>
-                            <p className="text-sm text-muted">
-                              S/ {Number(item.price).toFixed(2)} c/u
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
-                          <input
-                            type="number"
-                            min="1"
-                            max={item.stock}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateCartItemQuantity(
-                                item.store_product_id,
-                                Number(e.target.value)
-                              )
-                            }
-                            className="app-input h-11 min-w-0 max-w-full py-2"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeCartItem(item.store_product_id)
-                            }
-                            className="icon-button text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
-                            aria-label={`Quitar ${item.product_name}`}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-
-              <div className="mt-5 grid min-w-0 gap-3">
-                <div className="min-w-0">
-                  <div className="mb-2 flex items-center gap-2">
-                    <CalendarDays size={17} className="text-[var(--primary)]" />
-                    <label className="text-sm font-semibold">
-                      Fecha de recojo
-                    </label>
-                  </div>
-                  <div className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-1">
-                    <input
-                      type="date"
-                      value={pickupDate}
-                      min={getTodayDateInput()}
-                      onChange={(e) => setPickupDate(e.target.value)}
-                      className="app-input min-w-0 max-w-full border-0 bg-white"
-                    />
-                  </div>
-                </div>
-
-                {cartItems.some((item) => item.is_age_restricted) && (
-                  <label className="flex min-w-0 max-w-full items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                    <input
-                      type="checkbox"
-                      checked={adultConfirmed}
-                      onChange={async (event) => {
-                        const checked = event.target.checked;
-                        setAdultConfirmed(checked);
-                        if (currentUserId) {
-                          await supabase
-                            .from("profiles")
-                            .update({ adult_content_confirmed: checked })
-                            .eq("id", currentUserId);
-                        }
-                      }}
-                      className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
-                    />
-                    <span className="min-w-0 break-words">
-                      Declaro que soy mayor de 18 años y presentaré identificación si la tienda la solicita.
-                    </span>
-                  </label>
-                )}
-
-                <PickupTimePicker
-                  slots={pickupSlots}
-                  value={pickupTime}
-                  onChange={setPickupTime}
-                  isClosed={selectedPickupDay?.closed === true}
-                />
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold">
-                    Nota opcional
-                  </label>
-                  <input
-                    type="text"
-                    value={reservationNotes}
-                    onChange={(e) => setReservationNotes(e.target.value)}
-                    placeholder="Ejemplo: pasare despues del trabajo"
-                    className="app-input min-w-0 max-w-full"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 flex items-center justify-between border-t border-[#e5e7eb] pt-4">
-                <span className="font-semibold">Total</span>
-                <span className="text-lg font-bold">
-                  S/ {cartTotal.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3">
-                <button
-                  type="button"
-                  onClick={handleCreateReservation}
-                  disabled={creatingReservation}
-                  className="btn-primary disabled:opacity-60"
-                >
-                  {creatingReservation
-                    ? "Confirmando..."
-                    : !currentUserId
-                    ? "Inicia sesion para confirmar"
-                    : currentRole !== "customer"
-                    ? "Solo cliente puede confirmar"
-                    : "Confirmar reserva"}
-                </button>
-
-                {cartItems.length > 0 && (
-                  <button type="button" onClick={clearCart} className="btn-soft">
-                    Vaciar reserva
-                  </button>
-                )}
-                <Link
-                  href="/complaints"
-                  className="break-words text-center text-xs text-muted underline"
-                >
-                  Libro de Reclamaciones demostrativo
-                </Link>
-              </div>
-            </div>
+            {renderReservationPanel()}
           </motion.aside>
         </section>
       </div>
+
+      <AnimatePresence>
+        {cartItems.length > 0 ? (
+          <motion.div
+            className="fixed inset-x-0 bottom-0 z-[10030] border-t border-[var(--border)] bg-white/95 px-4 py-3 shadow-[0_-16px_40px_rgba(44,47,48,0.16)] backdrop-blur-xl lg:hidden"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0, y: 24 }}
+            transition={softSpringTransition}
+          >
+            <div className="mx-auto flex max-w-xl items-center gap-3 pb-[env(safe-area-inset-bottom)]">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {cartQuantity} {cartQuantity === 1 ? "producto" : "productos"}
+                </p>
+                <p className="text-sm text-muted">
+                  Total: S/ {cartTotal.toFixed(2)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReservationSheetOpen(true)}
+                className="btn-primary shrink-0 px-5"
+              >
+                Ver reserva
+              </button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {reservationSheetOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[10040] flex items-end lg:hidden"
+            role="presentation"
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+          >
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40 backdrop-blur-xl"
+              onClick={() => setReservationSheetOpen(false)}
+              aria-label="Cerrar reserva"
+            />
+            <motion.section
+              className="relative z-10 h-[88dvh] w-full"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Detalle de reserva"
+              initial={shouldReduceMotion ? false : { y: "100%" }}
+              animate={{ y: 0 }}
+              exit={shouldReduceMotion ? undefined : { y: "100%" }}
+              transition={softSpringTransition}
+            >
+              {renderReservationPanel({ mobile: true })}
+            </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }

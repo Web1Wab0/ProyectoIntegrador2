@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
+  ChevronDown,
   Clock,
   LocateFixed,
   MapPinOff,
@@ -11,6 +12,7 @@ import {
   Store,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
@@ -32,6 +34,12 @@ const SearchMap = dynamic(() => import("../components/search-map"), {
 
 const UNCATEGORIZED_ID = "uncategorized";
 const NEARBY_STORES_TIMEOUT_MS = 12000;
+const RADIUS_OPTIONS = [
+  { value: "1000", label: "1 km" },
+  { value: "3000", label: "3 km" },
+  { value: "5000", label: "5 km" },
+  { value: "10000", label: "10 km" },
+];
 
 type SearchResult = {
   store_product_id: string;
@@ -216,6 +224,89 @@ function storeHref(storeId: string, storeProductId?: string) {
     ? `?product=${encodeURIComponent(storeProductId)}`
     : "";
   return `/stores/${encodeURIComponent(storeId)}${params}`;
+}
+
+function RadiusDropdown({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion() === true;
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const selected = RADIUS_OPTIONS.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} className="relative min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-12 w-full items-center justify-between gap-2 rounded-lg bg-[#f7f7f7] px-4 text-sm font-semibold outline-none transition hover:bg-[var(--surface-high)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+        aria-expanded={open}
+      >
+        <span>{selected?.label ?? "3 km"}</span>
+        <ChevronDown
+          size={16}
+          className={`transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            className="surface-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-xl p-1"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.75 }}
+          >
+            {RADIUS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold transition hover:bg-[var(--surface-high)] ${
+                  option.value === value ? "text-[var(--primary)]" : ""
+                }`}
+              >
+                {option.label}
+                {option.value === value ? <span aria-hidden="true">•</span> : null}
+              </button>
+            ))}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 function StoreImage({
@@ -753,16 +844,7 @@ export default function SearchPage() {
               )}
             </div>
 
-            <select
-              value={radius}
-              onChange={(e) => setRadius(e.target.value)}
-              className="min-h-12 rounded-lg bg-[#f7f7f7] px-4 text-sm outline-none"
-            >
-              <option value="1000">1 km</option>
-              <option value="3000">3 km</option>
-              <option value="5000">5 km</option>
-              <option value="10000">10 km</option>
-            </select>
+            <RadiusDropdown value={radius} onChange={setRadius} />
 
             <button
               type="submit"
