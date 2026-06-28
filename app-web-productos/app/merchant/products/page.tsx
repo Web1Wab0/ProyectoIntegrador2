@@ -825,7 +825,7 @@ export default function MerchantProductsPage() {
               </label>
             </div>
 
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
               <FilterButton
                 active={activeFilter === FILTER_ALL}
                 onClick={() => setActiveFilter(FILTER_ALL)}
@@ -1018,7 +1018,7 @@ function InventoryList({
         <span className="text-right">Acciones</span>
       </div>
 
-      <div className="max-h-[72vh] overflow-y-auto bg-[var(--surface-lowest)]">
+      <div className="scrollbar-none max-h-[72vh] overflow-y-auto bg-[var(--surface-lowest)]">
         {products.map((item) => {
           const categoryName =
             item.product?.category_id && categoryNameById.has(item.product.category_id)
@@ -1224,7 +1224,7 @@ function ProductDrawer({
         </div>
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+          <div className="scrollbar-none min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
             <section className="app-card-soft p-4">
               <div className="flex items-start gap-3">
                 <AlertTriangle

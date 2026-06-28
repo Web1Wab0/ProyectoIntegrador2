@@ -139,7 +139,7 @@ export default function NotificationPreferencesPage() {
 
         <section className="app-card mt-6 p-5 sm:p-7">
           <h2 className="section-title text-xl">Apariencia</h2>
-          <div className="mt-4 overflow-x-auto"><ThemeToggle /></div>
+          <div className="scrollbar-none mt-4 overflow-x-auto"><ThemeToggle /></div>
         </section>
 
         <section className="app-card mt-5 p-5 sm:p-7">

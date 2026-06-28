@@ -39,7 +39,7 @@ export default function PickupTimePicker({
         </div>
       ) : (
         <div
-          className="grid min-w-0 max-w-full max-h-52 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-2 sm:grid-cols-3"
+          className="scrollbar-none grid min-w-0 max-w-full max-h-52 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--surface-high)] p-2 sm:grid-cols-3"
           role="radiogroup"
           aria-label="Horas disponibles para recoger"
         >

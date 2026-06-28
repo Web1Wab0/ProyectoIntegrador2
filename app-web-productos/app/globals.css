@@ -327,6 +327,15 @@ body {
     transform: translateY(-1px);
     box-shadow: var(--shadow-soft);
   }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 html[data-theme="dark"] .bg-white,

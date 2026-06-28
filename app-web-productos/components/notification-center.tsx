@@ -309,7 +309,7 @@ export default function NotificationCenter() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="motion-fade absolute inset-0 bg-black/45 backdrop-blur-[2px]"
+              className="motion-fade absolute inset-0 bg-black/40 backdrop-blur-xl"
               aria-label="Cerrar notificaciones"
             />
             <section
@@ -405,8 +405,8 @@ function NotificationPanel({
       <div
         className={
           mobile
-            ? "max-h-[calc(100dvh-13rem)] overflow-y-auto overscroll-contain px-3 py-3"
-            : "max-h-[min(480px,70vh)] overflow-y-auto overscroll-contain p-2"
+            ? "scrollbar-none max-h-[calc(100dvh-13rem)] overflow-y-auto overscroll-contain px-3 py-3"
+            : "scrollbar-none max-h-[min(480px,70vh)] overflow-y-auto overscroll-contain p-2"
         }
       >
         {loading ? (

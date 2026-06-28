@@ -648,7 +648,7 @@ export default function MerchantAnalyticsPage() {
                 <CalendarDays size={20} />
                 Próximos recojos
               </h2>
-              <div className="mt-4 max-h-[260px] space-y-2 overflow-y-auto">
+              <div className="scrollbar-none mt-4 max-h-[260px] space-y-2 overflow-y-auto">
                 {analytics.calendar.length === 0 ? (
                   <p className="text-sm text-muted">
                     No hay recojos en el rango seleccionado.

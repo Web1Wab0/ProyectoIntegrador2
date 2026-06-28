@@ -9,7 +9,9 @@ import {
   Plus,
   ShoppingBasket,
   Trash2,
+  X,
 } from "lucide-react";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
@@ -28,6 +30,36 @@ import RatingSummary from "../../../components/rating-summary";
 import { recordStoreEvent } from "../../../lib/analytics";
 
 const UNCATEGORIZED_ID = "uncategorized";
+const springTransition = {
+  type: "spring",
+  stiffness: 420,
+  damping: 36,
+  mass: 0.75,
+} as const;
+const softSpringTransition = {
+  type: "spring",
+  stiffness: 360,
+  damping: 34,
+  mass: 0.85,
+} as const;
+const catalogContainerVariants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.055,
+      delayChildren: 0.05,
+    },
+  },
+};
+const catalogItemVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.985 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: springTransition,
+  },
+};
 
 type StoreDetails = {
   id: string;
@@ -147,12 +179,176 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
   );
 }
 
+type ProductDetailModalProps = {
+  item: StoreCatalogItem;
+  storeId: string;
+  quantity: number;
+  rating: { average: number; count: number };
+  shouldReduceMotion: boolean;
+  onClose: () => void;
+  onQuantityChange: (quantity: number) => void;
+  onAdd: () => void;
+};
+
+function ProductDetailModal({
+  item,
+  storeId,
+  quantity,
+  rating,
+  shouldReduceMotion,
+  onClose,
+  onQuantityChange,
+  onAdd,
+}: ProductDetailModalProps) {
+  const productName = item.product?.product_name ?? "Producto";
+  const categoryName = item.product?.category_name ?? "Sin categoria";
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[10050] flex items-end justify-center p-3 sm:items-center sm:p-6"
+      role="presentation"
+      initial={shouldReduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40 backdrop-blur-xl"
+        onClick={onClose}
+        aria-label="Cerrar detalle de producto"
+      />
+
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`product-detail-${item.id}`}
+        className="relative z-10 grid max-h-[92dvh] w-full max-w-3xl min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-lowest)] shadow-[var(--shadow-popover)] sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
+        initial={
+          shouldReduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }
+        }
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={
+          shouldReduceMotion ? undefined : { opacity: 0, y: 18, scale: 0.98 }
+        }
+        transition={softSpringTransition}
+      >
+        <motion.div
+          layoutId={`product-image-${item.id}`}
+          className="relative flex min-h-64 items-center justify-center bg-[#eef1f4] sm:min-h-full"
+        >
+          {item.image_url ? (
+            <Image
+              src={item.image_url}
+              alt={productName}
+              fill
+              sizes="(max-width: 640px) 100vw, 380px"
+              className="object-contain p-5"
+              priority
+            />
+          ) : (
+            <span className="text-sm text-muted">Sin imagen</span>
+          )}
+        </motion.div>
+
+        <div className="scrollbar-none min-w-0 overflow-y-auto p-5 sm:p-6">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase text-[var(--primary)]">
+                {categoryName}
+                {item.product?.is_age_restricted ? " · 18+" : ""}
+              </p>
+              <h2
+                id={`product-detail-${item.id}`}
+                className="mt-2 break-words text-2xl font-bold leading-tight"
+              >
+                {productName}
+              </h2>
+              <div className="mt-2">
+                <RatingSummary
+                  average={rating.average}
+                  count={rating.count}
+                  compact
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="icon-button shrink-0"
+              aria-label="Cerrar"
+            >
+              <X size={19} />
+            </button>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <FavoriteButton kind="product" id={item.id} storeId={storeId} />
+            {item.product?.brand && (
+              <span className="rounded-full bg-[var(--surface-high)] px-3 py-1 text-xs font-semibold text-muted">
+                {item.product.brand}
+              </span>
+            )}
+            <span className="rounded-full bg-[var(--surface-high)] px-3 py-1 text-xs font-semibold text-muted">
+              Stock {item.stock}
+            </span>
+          </div>
+
+          <p className="mt-5 break-words text-sm leading-6 text-muted">
+            {item.product?.description || "Sin descripcion disponible."}
+          </p>
+
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-high)] p-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted">
+                  Precio
+                </p>
+                <p className="mt-1 text-2xl font-bold">
+                  S/ {Number(item.price).toFixed(2)}
+                </p>
+              </div>
+              <div className="w-28">
+                <label className="mb-2 block text-xs font-semibold text-muted">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={item.stock}
+                  value={quantity}
+                  onChange={(event) =>
+                    onQuantityChange(Number(event.target.value))
+                  }
+                  className="app-input h-11"
+                />
+              </div>
+            </div>
+
+            <motion.button
+              type="button"
+              onClick={onAdd}
+              className="btn-primary mt-4 w-full"
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
+              transition={softSpringTransition}
+            >
+              <Plus size={18} />
+              Agregar a reserva
+            </motion.button>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+}
+
 function categoryKey(categoryId: string | null) {
   return categoryId ?? UNCATEGORIZED_ID;
 }
 
 export default function StorePage() {
   const supabase = useMemo(() => createClient(), []);
+  const shouldReduceMotion = useReducedMotion() === true;
   const router = useRouter();
   const params = useParams<{ storeId: string }>();
   const searchParams = useSearchParams();
@@ -171,6 +367,9 @@ export default function StorePage() {
   const [activeCategoryId, setActiveCategoryId] = useState("all");
   const [quantityById, setQuantityById] = useState<Record<string, number>>({});
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<StoreCatalogItem | null>(
+    null
+  );
   const [pickupDate, setPickupDate] = useState(() => getTodayDateInput());
   const [pickupTime, setPickupTime] = useState("");
   const [reservationNotes, setReservationNotes] = useState("");
@@ -474,6 +673,19 @@ export default function StorePage() {
       return () => window.clearTimeout(timer);
     }
   }, [pickupSlots, pickupTime]);
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedProduct(null);
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [selectedProduct]);
 
   useEffect(() => {
     if (!highlightedProductId || !catalog.length) return;
@@ -827,7 +1039,7 @@ export default function StorePage() {
               </div>
 
               {catalog.length > 0 && (
-                <div className="mt-5 flex max-w-full gap-2 overflow-x-auto pb-2">
+                <div className="scrollbar-none mt-5 flex max-w-full gap-2 overflow-x-auto pb-2">
                   <button
                     type="button"
                     onClick={() => setActiveCategoryId("all")}
@@ -861,98 +1073,168 @@ export default function StorePage() {
                 </div>
               )}
 
-              {catalog.length === 0 ? (
-                <div className="info-box mt-5">
-                  Esta tienda todavia no tiene productos disponibles.
-                </div>
-              ) : (
-                <div className="mt-6 grid min-w-0 gap-5 md:grid-cols-2">
-                  {filteredCatalog.map((item) => {
-                    const highlighted = item.id === highlightedProductId;
+              <LayoutGroup id={`store-${store.id}-catalog`}>
+                {catalog.length === 0 ? (
+                  <div className="info-box mt-5">
+                    Esta tienda todavia no tiene productos disponibles.
+                  </div>
+                ) : (
+                  <motion.div
+                    className="mt-6 grid min-w-0 gap-5 md:grid-cols-2"
+                    variants={
+                      shouldReduceMotion ? undefined : catalogContainerVariants
+                    }
+                    initial={shouldReduceMotion ? false : "hidden"}
+                    animate="show"
+                  >
+                    {filteredCatalog.map((item) => {
+                      const highlighted = item.id === highlightedProductId;
 
-                    return (
-                      <article
-                        key={item.id}
-                        ref={highlighted ? highlightedRef : null}
-                        className={`min-w-0 max-w-full rounded-xl border bg-white p-4 transition ${
-                          highlighted
-                            ? "border-[var(--primary)] shadow-[0_10px_30px_rgba(121,0,243,0.13)]"
-                            : "border-[var(--border)] hover:shadow-md"
-                        }`}
-                      >
-                        <div className="relative flex h-44 items-center justify-center overflow-hidden rounded-2xl bg-[#eef1f4]">
-                          {item.image_url ? (
-                            <Image
-                              src={item.image_url}
-                              alt={item.product?.product_name ?? "Producto"}
-                              fill
-                              sizes="(max-width: 768px) 100vw, 360px"
-                              className="object-contain p-2"
-                            />
-                          ) : (
-                            <span className="text-sm text-muted">
-                              Sin imagen
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-4 flex min-w-0 items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="break-words text-lg font-semibold">
-                              {item.product?.product_name ?? "Producto"}
-                            </h3>
-                            <RatingSummary
-                              average={productRatings[item.id]?.average ?? 0}
-                              count={productRatings[item.id]?.count ?? 0}
-                              compact
-                            />
-                          </div>
-                          <FavoriteButton kind="product" id={item.id} storeId={store.id} />
-                        </div>
-                        <p className="mt-1 text-xs font-semibold uppercase text-[var(--primary)]">
-                          {item.product?.category_name ?? "Sin categoria"}
-                          {item.product?.is_age_restricted ? " · 18+" : ""}
-                        </p>
-                        <p className="mt-2 line-clamp-2 break-words text-sm text-muted">
-                          {item.product?.description || "Sin descripcion"}
-                        </p>
-                        <div className="mt-3 text-sm text-muted">
-                          <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
-                          <p>Stock: {item.stock}</p>
-                        </div>
-
-                        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                          <input
-                            type="number"
-                            min="1"
-                            max={item.stock}
-                            value={quantityById[item.id] ?? 1}
-                            onChange={(e) =>
-                              setQuantityById((prev) => ({
-                                ...prev,
-                                [item.id]: Number(e.target.value),
-                              }))
-                            }
-                            className="app-input sm:w-24"
-                          />
+                      return (
+                        <motion.article
+                          key={item.id}
+                          ref={highlighted ? highlightedRef : null}
+                          layout
+                          variants={
+                            shouldReduceMotion
+                              ? undefined
+                              : catalogItemVariants
+                          }
+                          whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+                          whileTap={
+                            shouldReduceMotion ? undefined : { scale: 0.99 }
+                          }
+                          transition={softSpringTransition}
+                          className={`min-w-0 max-w-full rounded-xl border bg-white p-4 transition ${
+                            highlighted
+                              ? "border-[var(--primary)] shadow-[0_10px_30px_rgba(121,0,243,0.13)]"
+                              : "border-[var(--border)] hover:shadow-md"
+                          }`}
+                        >
                           <button
                             type="button"
-                            onClick={() => handleAddCatalogItem(item)}
-                            className="btn-primary flex-1"
+                            onClick={() => setSelectedProduct(item)}
+                            className="block w-full rounded-2xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--primary)]"
+                            aria-label={`Ver detalle de ${
+                              item.product?.product_name ?? "producto"
+                            }`}
                           >
-                            <Plus size={18} />
-                            Agregar
+                            <motion.div
+                              layoutId={`product-image-${item.id}`}
+                              className="relative flex h-44 items-center justify-center overflow-hidden rounded-2xl bg-[#eef1f4]"
+                            >
+                              {item.image_url ? (
+                                <Image
+                                  src={item.image_url}
+                                  alt={item.product?.product_name ?? "Producto"}
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, 360px"
+                                  className="object-contain p-2"
+                                />
+                              ) : (
+                                <span className="text-sm text-muted">
+                                  Sin imagen
+                                </span>
+                              )}
+                            </motion.div>
                           </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
+
+                          <div className="mt-4 flex min-w-0 items-start justify-between gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProduct(item)}
+                              className="min-w-0 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--primary)]"
+                            >
+                              <h3 className="break-words text-lg font-semibold">
+                                {item.product?.product_name ?? "Producto"}
+                              </h3>
+                              <RatingSummary
+                                average={productRatings[item.id]?.average ?? 0}
+                                count={productRatings[item.id]?.count ?? 0}
+                                compact
+                              />
+                            </button>
+                            <FavoriteButton
+                              kind="product"
+                              id={item.id}
+                              storeId={store.id}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs font-semibold uppercase text-[var(--primary)]">
+                            {item.product?.category_name ?? "Sin categoria"}
+                            {item.product?.is_age_restricted ? " · 18+" : ""}
+                          </p>
+                          <p className="mt-2 line-clamp-2 break-words text-sm text-muted">
+                            {item.product?.description || "Sin descripcion"}
+                          </p>
+                          <div className="mt-3 text-sm text-muted">
+                            <p>Precio: S/ {Number(item.price).toFixed(2)}</p>
+                            <p>Stock: {item.stock}</p>
+                          </div>
+
+                          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                            <input
+                              type="number"
+                              min="1"
+                              max={item.stock}
+                              value={quantityById[item.id] ?? 1}
+                              onChange={(e) =>
+                                setQuantityById((prev) => ({
+                                  ...prev,
+                                  [item.id]: Number(e.target.value),
+                                }))
+                              }
+                              className="app-input sm:w-24"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddCatalogItem(item)}
+                              className="btn-primary flex-1"
+                            >
+                              <Plus size={18} />
+                              Agregar
+                            </button>
+                          </div>
+                        </motion.article>
+                      );
+                    })}
+                  </motion.div>
+                )}
+
+                <AnimatePresence>
+                  {selectedProduct && (
+                    <ProductDetailModal
+                      item={selectedProduct}
+                      storeId={store.id}
+                      quantity={quantityById[selectedProduct.id] ?? 1}
+                      rating={
+                        productRatings[selectedProduct.id] ?? {
+                          average: 0,
+                          count: 0,
+                        }
+                      }
+                      shouldReduceMotion={shouldReduceMotion}
+                      onClose={() => setSelectedProduct(null)}
+                      onQuantityChange={(quantity) =>
+                        setQuantityById((prev) => ({
+                          ...prev,
+                          [selectedProduct.id]: quantity,
+                        }))
+                      }
+                      onAdd={() => handleAddCatalogItem(selectedProduct)}
+                    />
+                  )}
+                </AnimatePresence>
+              </LayoutGroup>
             </section>
           </div>
 
-          <aside className="min-w-0 w-full max-w-full lg:sticky lg:top-24">
+          <motion.aside
+            className="min-w-0 w-full max-w-full lg:sticky lg:top-24"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={softSpringTransition}
+          >
             <div className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-[var(--border)] bg-white p-5 shadow-[0_14px_36px_rgba(44,47,48,0.10)]">
               <h2 className="flex items-center gap-2 text-xl font-bold">
                 <ShoppingBasket size={21} className="text-[var(--primary)]" />
@@ -967,60 +1249,77 @@ export default function StorePage() {
                   Todavia no agregaste productos.
                 </div>
               ) : (
-                <div className="mt-4 min-w-0 space-y-3">
-                  {cartItems.map((item) => (
-                    <div
-                      key={item.store_product_id}
-                      className="min-w-0 w-full max-w-full rounded-2xl bg-[#f7f7f7] p-3"
-                    >
-                      <div className="flex min-w-0 gap-3">
-                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#eef1f4]">
-                          {item.image_url ? (
-                            <Image
-                              src={item.image_url}
-                              alt={item.product_name}
-                              fill
-                              sizes="56px"
-                              className="object-contain p-1"
-                            />
-                          ) : null}
+                <motion.div layout className="mt-4 min-w-0 space-y-3">
+                  <AnimatePresence initial={false}>
+                    {cartItems.map((item) => (
+                      <motion.div
+                        key={item.store_product_id}
+                        layout
+                        initial={
+                          shouldReduceMotion
+                            ? false
+                            : { opacity: 0, y: 8, scale: 0.98 }
+                        }
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={
+                          shouldReduceMotion
+                            ? undefined
+                            : { opacity: 0, y: -8, scale: 0.98 }
+                        }
+                        transition={softSpringTransition}
+                        className="min-w-0 w-full max-w-full rounded-2xl bg-[#f7f7f7] p-3"
+                      >
+                        <div className="flex min-w-0 gap-3">
+                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#eef1f4]">
+                            {item.image_url ? (
+                              <Image
+                                src={item.image_url}
+                                alt={item.product_name}
+                                fill
+                                sizes="56px"
+                                className="object-contain p-1"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-sm font-semibold">
+                              {item.product_name}
+                            </p>
+                            <p className="text-sm text-muted">
+                              S/ {Number(item.price).toFixed(2)} c/u
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="break-words text-sm font-semibold">
-                            {item.product_name}
-                          </p>
-                          <p className="text-sm text-muted">
-                            S/ {Number(item.price).toFixed(2)} c/u
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          max={item.stock}
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateCartItemQuantity(
-                              item.store_product_id,
-                              Number(e.target.value)
-                            )
-                          }
-                          className="app-input h-11 min-w-0 max-w-full py-2"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeCartItem(item.store_product_id)}
-                          className="icon-button text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
-                          aria-label={`Quitar ${item.product_name}`}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_40px] gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max={item.stock}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateCartItemQuantity(
+                                item.store_product_id,
+                                Number(e.target.value)
+                              )
+                            }
+                            className="app-input h-11 min-w-0 max-w-full py-2"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeCartItem(item.store_product_id)
+                            }
+                            className="icon-button text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
+                            aria-label={`Quitar ${item.product_name}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
               )}
 
               <div className="mt-5 grid min-w-0 gap-3">
@@ -1122,7 +1421,7 @@ export default function StorePage() {
                 </Link>
               </div>
             </div>
-          </aside>
+          </motion.aside>
         </section>
       </div>
     </main>
