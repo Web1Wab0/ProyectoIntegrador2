@@ -84,20 +84,24 @@ export default function NumberStepper({
           <Minus size={16} />
         </button>
         <input
-          type="number"
+          type="text"
           inputMode={inputMode}
-          min={min}
-          max={max}
-          step={step}
           value={rawValue}
           disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            const pattern =
+              inputMode === "decimal" ? /^-?\d*([.,]\d*)?$/ : /^-?\d*$/;
+            if (nextValue === "" || pattern.test(nextValue)) {
+              onChange(nextValue.replace(",", "."));
+            }
+          }}
           onBlur={(event) => {
             if (event.target.value === "") return;
             const next = Number(event.target.value);
             if (Number.isFinite(next)) commit(next);
           }}
-          className={`min-w-0 border-0 bg-transparent px-2 py-2 text-center font-semibold text-[var(--on-surface)] outline-none disabled:cursor-not-allowed disabled:opacity-60 ${inputClassName}`}
+          className={`min-w-0 border-0 bg-transparent px-1 py-2 text-center font-semibold text-[var(--on-surface)] outline-none disabled:cursor-not-allowed disabled:opacity-60 ${inputClassName}`}
         />
         <button
           type="button"

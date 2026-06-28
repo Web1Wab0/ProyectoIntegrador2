@@ -25,6 +25,7 @@ import { createClient } from "../../../lib/supabase/client";
 import PageLoading from "../../../components/page-loading";
 import { useToast } from "../../../components/toast-provider";
 import NumberStepper from "../../../components/number-stepper";
+import CategoryPicker from "../../../components/category-picker";
 
 type Category = {
   id: string;
@@ -1288,20 +1289,11 @@ function ProductDrawer({
                 </div>
 
                 <div>
-                  <label className="mb-2 block small-label">Categoría</label>
-                  <select
+                  <CategoryPicker
                     value={categoryId}
-                    onChange={(event) => onCategoryIdChange(event.target.value)}
-                    className="app-input"
-                  >
-                    <option value="">Sin categoría</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                        {category.is_age_restricted ? " (18+)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={onCategoryIdChange}
+                    categories={categories}
+                  />
                 </div>
               </div>
             </section>
