@@ -954,13 +954,23 @@ export default function StorePage() {
 
     return (
       <div
-        className={`flex min-h-0 w-full max-w-full flex-col overflow-hidden border border-[var(--border)] bg-white shadow-[0_14px_36px_rgba(44,47,48,0.10)] ${
+        className={`flex min-h-0 w-full max-w-full flex-col overflow-hidden border border-[var(--border)] bg-[var(--surface-lowest)] shadow-[0_14px_36px_rgba(44,47,48,0.10)] ${
           mobile
             ? "h-full rounded-t-[22px]"
             : "max-h-[calc(100vh-7rem)] rounded-xl"
         }`}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] p-5">
+        {mobile ? (
+          <div className="flex shrink-0 justify-center pt-3">
+            <span className="h-1.5 w-12 rounded-full bg-[var(--border)]" />
+          </div>
+        ) : null}
+
+        <div
+          className={`flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] ${
+            mobile ? "px-5 pb-4 pt-3" : "p-5"
+          }`}
+        >
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-xl font-bold">
               <ShoppingBasket size={21} className="text-[var(--primary)]" />
@@ -1071,7 +1081,7 @@ export default function StorePage() {
                   value={pickupDate}
                   min={getTodayDateInput()}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="app-input min-w-0 max-w-full border-0 bg-white"
+                  className="app-input min-w-0 max-w-full border-0 bg-[var(--surface-lowest)]"
                 />
               </div>
             </div>
@@ -1121,7 +1131,7 @@ export default function StorePage() {
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-[var(--border)] bg-white p-5">
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface-lowest)] p-5">
           <div className="flex items-center justify-between">
             <span className="font-semibold">Total</span>
             <span className="text-lg font-bold">S/ {cartTotal.toFixed(2)}</span>
@@ -1188,7 +1198,9 @@ export default function StorePage() {
   return (
     <main
       className={`min-h-screen bg-white text-[var(--on-surface)] ${
-        cartItems.length > 0 ? "pb-28 lg:pb-0" : ""
+        cartItems.length > 0
+          ? "pb-[calc(10rem+env(safe-area-inset-bottom))] lg:pb-0"
+          : ""
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -1477,25 +1489,36 @@ export default function StorePage() {
       <AnimatePresence>
         {cartItems.length > 0 ? (
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-[10030] border-t border-[var(--border)] bg-white/95 px-4 py-3 shadow-[0_-16px_40px_rgba(44,47,48,0.16)] backdrop-blur-xl lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-[10030] border-t border-[var(--border)] bg-[var(--surface-lowest)] px-4 py-3 shadow-[0_-16px_40px_rgba(44,47,48,0.16)] backdrop-blur-xl lg:hidden"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={shouldReduceMotion ? undefined : { opacity: 0, y: 24 }}
             transition={softSpringTransition}
           >
-            <div className="mx-auto flex max-w-xl items-center gap-3 pb-[env(safe-area-inset-bottom)]">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">
-                  {cartQuantity} {cartQuantity === 1 ? "producto" : "productos"}
-                </p>
-                <p className="text-sm text-muted">
-                  Total: S/ {cartTotal.toFixed(2)}
-                </p>
+            <div className="mx-auto flex max-w-xl flex-col gap-3 pb-[env(safe-area-inset-bottom)]">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Reserva
+                  </p>
+                  <p className="truncate text-sm font-semibold">
+                    {cartQuantity}{" "}
+                    {cartQuantity === 1 ? "producto" : "productos"}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Total
+                  </p>
+                  <p className="text-base font-bold">
+                    S/ {cartTotal.toFixed(2)}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setReservationSheetOpen(true)}
-                className="btn-primary shrink-0 px-5"
+                className="btn-primary w-full px-5"
               >
                 Ver reserva
               </button>
