@@ -2,7 +2,15 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { LocateFixed, Search, Store, X } from "lucide-react";
+import {
+  Clock,
+  LocateFixed,
+  MapPinOff,
+  PackageSearch,
+  Search,
+  Store,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
@@ -14,6 +22,9 @@ import Notice from "../components/notice";
 import StoreHoursDisplay from "../components/store-hours-display";
 import FavoriteButton from "../components/favorite-button";
 import RatingSummary from "../components/rating-summary";
+import EmptyState from "../components/empty-state";
+import { SkeletonGrid } from "../components/skeleton-card";
+import { useSearchHistory } from "../lib/use-search-history";
 
 const SearchMap = dynamic(() => import("../components/search-map"), {
   ssr: false,
@@ -220,7 +231,9 @@ function StoreImage({
 }) {
   return (
     <div
-      className={`${className} relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4]`}
+      className={`${className} listing-card-media ${
+        fit === "cover" ? "listing-card-media-cover" : ""
+      } relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[#eef1f4]`}
     >
       {src ? (
         <Image
@@ -242,6 +255,7 @@ function StoreImage({
 export default function SearchPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const { history, addSearch } = useSearchHistory();
   const nearbyStoresRequestIdRef = useRef(0);
   const nearbyStoresAbortRef = useRef<AbortController | null>(null);
 
@@ -263,6 +277,7 @@ export default function SearchPage() {
   const [locationAttempted, setLocationAttempted] = useState(false);
   const [loadingStores, setLoadingStores] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [storeRatings, setStoreRatings] = useState<
     Record<string, { average: number; count: number }>
   >({});
@@ -270,7 +285,7 @@ export default function SearchPage() {
     Record<string, { average: number; count: number }>
   >({});
 
-  const isSearchMode = results.length > 0;
+  const isSearchMode = lastSearch.trim().length > 0;
 
   useEffect(() => {
     const storeIds = Array.from(
@@ -578,10 +593,10 @@ export default function SearchPage() {
     return () => window.clearTimeout(timer);
   }, [loadNearbyStores, userLat, userLng]);
 
-  async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function runSearch(term: string) {
+    const query = term.trim();
 
-    if (!search.trim()) {
+    if (!query) {
       setResults([]);
       setLastSearch("");
       setSelectedResultId(null);
@@ -600,11 +615,15 @@ export default function SearchPage() {
       return;
     }
 
+    setLastSearch(query);
+    setResults([]);
+    setSelectedResultId(null);
+    setSelectedStoreId(null);
     setSearching(true);
     setNotice(null);
 
     const { data, error } = await supabase.rpc("search_nearby_products", {
-      p_search: search.trim(),
+      p_search: query,
       p_user_lat: userLat,
       p_user_lng: userLng,
       p_radius_meters: Number(radius),
@@ -622,9 +641,9 @@ export default function SearchPage() {
 
     const rows = ((data as RawSearchResult[]) ?? []).map(normalizeSearchResult);
     setResults(rows);
-    setLastSearch(search.trim());
     setSelectedResultId(rows[0]?.store_product_id ?? null);
     setSelectedStoreId(rows[0]?.store_id ?? null);
+    addSearch(query);
     setSearching(false);
 
     if (rows.length === 0) {
@@ -633,6 +652,11 @@ export default function SearchPage() {
         message: "No se encontraron productos cercanos para esa busqueda.",
       });
     }
+  }
+
+  async function handleSearch(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    await runSearch(search);
   }
 
   function clearSearch() {
@@ -656,6 +680,15 @@ export default function SearchPage() {
         <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
           <div className="grid gap-4 lg:grid-cols-[1fr_220px] lg:items-end">
             <div className="min-w-0">
+              <div className="mb-3 inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-high)] px-3 py-1.5 text-xs font-semibold text-muted">
+                <LocateFixed size={13} className="text-[var(--primary)]" />
+                <span className="truncate">
+                  {userLat !== null && userLng !== null
+                    ? "Ubicación activa"
+                    : "Ubicación pendiente"}{" "}
+                  · radio {Number(radius) / 1000} km
+                </span>
+              </div>
               <h1 className="page-title text-2xl sm:text-3xl">
                 Encuentra tiendas y productos cerca de ti
               </h1>
@@ -683,13 +716,42 @@ export default function SearchPage() {
             onSubmit={handleSearch}
             className="grid gap-2 rounded-xl border border-[var(--border)] bg-white p-2 shadow-sm md:grid-cols-[1fr_150px_120px_auto]"
           >
-            <input
-              type="text"
-              placeholder="Busca arroz, leche, gaseosa..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="min-h-12 rounded-lg px-4 text-sm outline-none focus:bg-[var(--surface-high)]"
-            />
+            <div className="relative min-w-0">
+              <input
+                type="text"
+                placeholder="Busca arroz, leche, gaseosa..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() =>
+                  window.setTimeout(() => setSearchFocused(false), 120)
+                }
+                className="min-h-12 w-full rounded-lg px-4 text-sm outline-none focus:bg-[var(--surface-high)]"
+              />
+              {searchFocused && history.length > 0 && (
+                <div className="motion-pop surface-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-xl p-2">
+                  <p className="px-3 py-2 text-xs font-semibold uppercase text-muted">
+                    Búsquedas recientes
+                  </p>
+                  {history.map((term) => (
+                    <button
+                      key={term}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setSearch(term);
+                        setSearchFocused(false);
+                        void runSearch(term);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--surface-high)]"
+                    >
+                      <Clock size={15} className="text-[var(--primary)]" />
+                      <span className="min-w-0 truncate">{term}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <select
               value={radius}
@@ -748,10 +810,26 @@ export default function SearchPage() {
           </div>
 
           {userLat === null || userLng === null ? (
-            <div className="rounded-xl border border-[var(--border)] bg-[#f7f7f7] p-6 text-sm text-muted">
-              Acepta el permiso de ubicacion para ver tiendas cercanas en el
-              mapa.
-            </div>
+            <EmptyState
+              icon={MapPinOff}
+              title="Activa tu ubicación"
+              description="Acepta el permiso del navegador para ver tiendas cercanas y comparar productos en el mapa."
+              action={{
+                label: "Usar mi ubicación",
+                onClick: requestUserLocation,
+              }}
+              className="mt-4"
+            />
+          ) : searching && isSearchMode ? (
+            <SkeletonGrid count={4} imageHeightClass="h-64" />
+          ) : isSearchMode && results.length === 0 ? (
+            <EmptyState
+              icon={PackageSearch}
+              title="Sin productos cercanos"
+              description="No encontramos productos para esa búsqueda en el radio actual. Prueba otro término o vuelve a explorar tiendas."
+              action={{ label: "Ver tiendas", onClick: clearSearch }}
+              className="mt-4"
+            />
           ) : isSearchMode ? (
             <div className="grid gap-x-6 gap-y-8 md:grid-cols-2">
               {results.map((item) => (
@@ -761,7 +839,7 @@ export default function SearchPage() {
                     setSelectedResultId(item.store_product_id);
                     setSelectedStoreId(item.store_id);
                   }}
-                  className="group relative cursor-pointer"
+                  className="listing-card group relative cursor-pointer rounded-xl border border-transparent p-1"
                   onClick={() =>
                     router.push(storeHref(item.store_id, item.store_product_id))
                   }
@@ -814,11 +892,19 @@ export default function SearchPage() {
                 </article>
               ))}
             </div>
-          ) : nearbyStores.length === 0 && !loadingStores ? (
-            <div className="rounded-xl border border-[var(--border)] bg-[#f7f7f7] p-6 text-sm text-muted">
-              No encontramos tiendas activas en este radio. Prueba ampliarlo o
-              vuelve a intentar tu ubicacion.
-            </div>
+          ) : loadingStores ? (
+            <SkeletonGrid count={4} imageHeightClass="h-64" />
+          ) : nearbyStores.length === 0 ? (
+            <EmptyState
+              icon={Store}
+              title="Sin tiendas en este radio"
+              description="No encontramos tiendas activas cerca de tu ubicación. Puedes ampliar el radio o reintentar la ubicación."
+              action={{
+                label: "Ampliar radio",
+                onClick: () => setRadius("10000"),
+              }}
+              className="mt-4"
+            />
           ) : (
             <div className="grid gap-x-6 gap-y-8 md:grid-cols-2">
               {nearbyStores.map((store) => (
@@ -826,7 +912,7 @@ export default function SearchPage() {
                   key={store.store_id}
                   onMouseEnter={() => setSelectedStoreId(store.store_id)}
                   onClick={() => router.push(storeHref(store.store_id))}
-                  className="group relative cursor-pointer"
+                  className="listing-card group relative cursor-pointer rounded-xl border border-transparent p-1"
                 >
                   <StoreImage
                     src={store.image_url}

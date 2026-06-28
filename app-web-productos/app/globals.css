@@ -126,7 +126,7 @@ body {
   .btn-primary:hover {
     filter: brightness(0.96);
     transform: translateY(-1px);
-    box-shadow: 0 12px 26px rgba(121, 0, 243, 0.22);
+    box-shadow: 0 14px 30px rgba(121, 0, 243, 0.26);
   }
 
   .btn-primary:active,
@@ -196,6 +196,14 @@ body {
     background: rgba(121, 0, 243, 0.07);
     color: var(--primary);
     box-shadow: 0 7px 18px var(--shadow);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: rgba(121, 0, 243, 0.38);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+    outline: none;
   }
 
   .page-title {
@@ -328,6 +336,29 @@ body {
     box-shadow: var(--shadow-soft);
   }
 
+  .listing-card {
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-medium) var(--ease-standard),
+      transform var(--duration-medium) var(--ease-standard);
+  }
+
+  .listing-card:hover {
+    border-color: rgba(121, 0, 243, 0.28);
+    box-shadow: 0 12px 32px rgba(44, 47, 48, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .listing-card-media img {
+    transition: transform 320ms var(--ease-emphasized);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .listing-card:hover .listing-card-media-cover img {
+      transform: scale(1.045);
+    }
+  }
+
   .scrollbar-none {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -393,6 +424,15 @@ html[data-theme="dark"] .border-\[\#d1d5db\] {
   }
 }
 
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes popover-enter {
   from {
     opacity: 0;
@@ -434,6 +474,11 @@ html[data-theme="dark"] .border-\[\#d1d5db\] {
   animation: toast-enter 180ms ease-out;
 }
 
+.toast-progress {
+  animation: toast-progress linear forwards;
+  transform-origin: left;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -442,6 +487,10 @@ html[data-theme="dark"] .border-\[\#d1d5db\] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .toast-progress {
+    animation: none !important;
   }
 }
 

@@ -20,6 +20,7 @@ import {
 } from "react";
 import { createClient } from "../lib/supabase/client";
 import { useToast, type ToastType } from "./toast-provider";
+import EmptyState from "./empty-state";
 
 type NotificationRow = {
   id: string;
@@ -416,17 +417,12 @@ function NotificationPanel({
             ))}
           </div>
         ) : notifications.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-high)] text-[var(--muted-soft)]">
-              <Bell size={26} />
-            </span>
-            <p className="mt-3 text-sm font-semibold text-[var(--on-surface)]">
-              No tienes notificaciones todavía.
-            </p>
-            <p className="mt-1 text-xs leading-5 text-muted">
-              Aquí aparecerán reservas, cambios de estado y avisos importantes.
-            </p>
-          </div>
+          <EmptyState
+            icon={Bell}
+            title="Sin notificaciones"
+            description="Aquí aparecerán reservas, cambios de estado y avisos importantes."
+            className="border-0 bg-transparent px-4 py-9 shadow-none"
+          />
         ) : (
           <div className="grid gap-2">
             {notifications.map((notification) => (

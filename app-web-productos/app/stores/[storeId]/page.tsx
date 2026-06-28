@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CalendarDays,
   MapPin,
+  PackageSearch,
   Plus,
   ShoppingBasket,
   Trash2,
@@ -28,6 +29,8 @@ import StoreHoursDisplay from "../../../components/store-hours-display";
 import FavoriteButton from "../../../components/favorite-button";
 import RatingSummary from "../../../components/rating-summary";
 import { recordStoreEvent } from "../../../lib/analytics";
+import EmptyState from "../../../components/empty-state";
+import { SkeletonGrid } from "../../../components/skeleton-card";
 
 const UNCATEGORIZED_ID = "uncategorized";
 const springTransition = {
@@ -936,10 +939,7 @@ export default function StorePage() {
         <div className="mx-auto max-w-7xl space-y-5">
           <div className="skeleton h-8 w-40 rounded-lg" />
           <div className="skeleton h-[360px] rounded-xl" />
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="skeleton h-72 rounded-xl" />
-            <div className="skeleton h-72 rounded-xl" />
-          </div>
+          <SkeletonGrid count={2} imageHeightClass="h-44" />
         </div>
       </main>
     );
@@ -1075,9 +1075,12 @@ export default function StorePage() {
 
               <LayoutGroup id={`store-${store.id}-catalog`}>
                 {catalog.length === 0 ? (
-                  <div className="info-box mt-5">
-                    Esta tienda todavia no tiene productos disponibles.
-                  </div>
+                  <EmptyState
+                    icon={PackageSearch}
+                    title="Catálogo en preparación"
+                    description="Esta tienda todavía no tiene productos disponibles para reservar."
+                    className="mt-5 shadow-none"
+                  />
                 ) : (
                   <motion.div
                     className="mt-6 grid min-w-0 gap-5 md:grid-cols-2"

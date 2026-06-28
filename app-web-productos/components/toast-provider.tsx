@@ -48,27 +48,36 @@ const DEFAULT_DURATIONS: Record<ToastType, number> = {
 
 const toastStyles: Record<
   ToastType,
-  { icon: typeof Info; iconClass: string; borderClass: string }
+  {
+    icon: typeof Info;
+    iconClass: string;
+    borderClass: string;
+    progressClass: string;
+  }
 > = {
   success: {
     icon: CheckCircle2,
     iconClass: "text-emerald-600",
     borderClass: "border-emerald-200",
+    progressClass: "bg-emerald-500",
   },
   info: {
     icon: Info,
     iconClass: "text-[var(--secondary)]",
     borderClass: "border-cyan-200",
+    progressClass: "bg-[var(--primary)]",
   },
   warning: {
     icon: AlertTriangle,
     iconClass: "text-amber-600",
     borderClass: "border-amber-200",
+    progressClass: "bg-amber-500",
   },
   error: {
     icon: XCircle,
     iconClass: "text-[var(--danger)]",
     borderClass: "border-red-200",
+    progressClass: "bg-[var(--danger)]",
   },
 };
 
@@ -146,6 +155,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((toast) => {
           const style = toastStyles[toast.type];
           const Icon = style.icon;
+          const duration = toast.duration ?? DEFAULT_DURATIONS[toast.type];
           const content = (
             <>
               <Icon
@@ -167,6 +177,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     Ver detalle
                   </span>
                 ) : null}
+                <div className="mt-3 h-0.5 overflow-hidden rounded-full bg-[var(--surface-high)]">
+                  <div
+                    className={`toast-progress h-full rounded-full ${style.progressClass}`}
+                    style={{ animationDuration: `${duration}ms` }}
+                  />
+                </div>
               </div>
             </>
           );

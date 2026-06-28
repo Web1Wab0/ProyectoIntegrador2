@@ -9,6 +9,7 @@ import Notice from "../../../components/notice";
 import ReservationStatus from "../../../components/reservation-status";
 import PageLoading from "../../../components/page-loading";
 import ReservationReviewForm from "../../../components/reservation-review-form";
+import EmptyState from "../../../components/empty-state";
 
 type ReservationItem = {
   id: string;
@@ -318,13 +319,13 @@ export default function CustomerReservationsPage() {
         {notice && <Notice type={notice.type} message={notice.message} />}
 
         {reservations.length === 0 ? (
-          <div className="app-card mt-4 p-4 shadow-lg sm:p-6">
-            <CalendarClock className="mb-3 text-[var(--primary)]" />
-            <p className="font-semibold">No tienes reservas todavía.</p>
-            <p className="mt-1 text-sm text-muted">
-              Explora tiendas cercanas y agrega productos para crear la primera.
-            </p>
-          </div>
+          <EmptyState
+            icon={CalendarClock}
+            title="No tienes reservas todavía"
+            description="Explora tiendas cercanas y agrega productos para crear tu primera reserva."
+            action={{ label: "Explorar tiendas", href: "/" }}
+            className="mt-4"
+          />
         ) : (
           <div className="mt-4 space-y-4">
             {reservations.map((item) => (

@@ -4,9 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
+  CalendarClock,
   Check,
   CheckCheck,
   PackageCheck,
+  Store,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +19,7 @@ import ReservationStatus, {
   getReservationStatusLabel,
 } from "../../../components/reservation-status";
 import PageLoading from "../../../components/page-loading";
+import EmptyState from "../../../components/empty-state";
 
 type ReservationItem = {
   id: string;
@@ -402,13 +405,21 @@ export default function MerchantReservationsPage() {
         {notice && <Notice type={notice.type} message={notice.message} />}
 
         {!storeId ? (
-          <div className="mt-4 app-card p-4 shadow-lg sm:p-6">
-            No se encontró una tienda asociada.
-          </div>
+          <EmptyState
+            icon={Store}
+            title="Tienda no encontrada"
+            description="Primero completa la configuración del local para poder recibir y gestionar reservas."
+            action={{ label: "Configurar local", href: "/merchant/setup" }}
+            className="mt-4"
+          />
         ) : reservations.length === 0 ? (
-          <div className="mt-4 app-card p-4 shadow-lg sm:p-6">
-            No hay reservas todavía.
-          </div>
+          <EmptyState
+            icon={CalendarClock}
+            title="Sin reservas todavía"
+            description="Cuando un cliente reserve productos de tu tienda, aparecerán aquí para confirmarlas y dar seguimiento."
+            action={{ label: "Ver productos", href: "/merchant/products" }}
+            className="mt-4"
+          />
         ) : (
           <div className="mt-4 space-y-4">
             {reservations.map((item) => {

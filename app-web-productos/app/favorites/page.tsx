@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
 import FavoriteButton from "../../components/favorite-button";
 import PageLoading from "../../components/page-loading";
+import EmptyState from "../../components/empty-state";
 
 type StoreFavorite = {
   store_id: string;
@@ -116,15 +117,21 @@ export default function FavoritesPage() {
             Tiendas
           </h2>
           {stores.length === 0 ? (
-            <div className="info-box mt-4">Aún no guardaste tiendas favoritas.</div>
+            <EmptyState
+              icon={Store}
+              title="Sin tiendas favoritas"
+              description="Guarda tus tiendas preferidas para volver a ellas sin buscarlas de nuevo."
+              action={{ label: "Explorar tiendas", href: "/" }}
+              className="mt-4"
+            />
           ) : (
             <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {stores.map((favorite) => {
                 const store = favorite.stores;
                 if (!store) return null;
                 return (
-                  <Link key={store.id} href={`/stores/${store.id}`} className="app-card overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lg">
-                    <div className="relative h-48 bg-[var(--surface-high)]">
+                  <Link key={store.id} href={`/stores/${store.id}`} className="listing-card app-card overflow-hidden">
+                    <div className="listing-card-media listing-card-media-cover relative h-48 bg-[var(--surface-high)]">
                       {store.image_url ? (
                         <Image src={store.image_url} alt={store.store_name} fill className="object-cover" />
                       ) : null}
@@ -147,15 +154,21 @@ export default function FavoritesPage() {
             Productos
           </h2>
           {products.length === 0 ? (
-            <div className="info-box mt-4">Aún no guardaste productos favoritos.</div>
+            <EmptyState
+              icon={PackageSearch}
+              title="Sin productos favoritos"
+              description="Marca productos con el corazón para seguirlos y encontrarlos rápidamente."
+              action={{ label: "Buscar productos", href: "/" }}
+              className="mt-4"
+            />
           ) : (
             <div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {products.map((favorite) => {
                 const item = favorite.store_products;
                 if (!item) return null;
                 return (
-                  <Link key={item.id} href={`/stores/${item.store_id}?product=${item.id}`} className="app-card p-4 transition hover:-translate-y-0.5 hover:shadow-lg">
-                    <div className="relative h-44 rounded-lg bg-[var(--surface-high)]">
+                  <Link key={item.id} href={`/stores/${item.store_id}?product=${item.id}`} className="listing-card app-card p-4">
+                    <div className="listing-card-media relative h-44 rounded-lg bg-[var(--surface-high)]">
                       {item.image_url ? (
                         <Image src={item.image_url} alt={item.products?.product_name || "Producto"} fill className="object-contain p-3" />
                       ) : null}
